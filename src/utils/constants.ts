@@ -4,6 +4,7 @@ export const APP_DESCRIPTION = 'Web Chatbot Pháp Lý Nội Bộ Doanh Nghiệp 
 export const ROLES = {
   USER: 'user',
   ADMIN: 'admin',
+  MODERATOR: 'moderator',
 } as const
 
 export type UserRole = typeof ROLES[keyof typeof ROLES]

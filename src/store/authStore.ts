@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { UserRole } from '@/utils/constants'
+import { readDirectoryUsers } from '@/utils/demoUserDirectory'
 
 interface User {
   id: string
@@ -39,14 +40,19 @@ export const useAuthStore = create<AuthState>()(
         // Simulate API call
         await new Promise(resolve => setTimeout(resolve, 1000))
         
-        // Demo user data
-        const isAdmin = email.trim().toLowerCase() === 'ngtiendatt1105@gmail.com' && password === 'admin123'
+        const normalizedEmail = email.trim().toLowerCase()
+        const isAdmin = normalizedEmail === 'ngtiendatt1105@gmail.com' && password === 'admin123'
+        const directoryUser = readDirectoryUsers().find(item => item.email.toLowerCase() === normalizedEmail)
+        if (!isAdmin && (!directoryUser || directoryUser.status !== 'active' || password !== 'password123')) {
+          set({ isLoading: false })
+          throw new Error('Tài khoản chưa được admin cấp, đang bị khóa hoặc mật khẩu không đúng.')
+        }
         const demoUser: User = {
-          id: 'user_123',
-          email: email,
-          name: isAdmin ? 'Quản trị viên' : 'Nguyễn Văn A',
-          role: isAdmin ? 'admin' : 'user',
-          department: isAdmin ? 'IT Department' : 'Phòng Pháp chế',
+          id: isAdmin ? 'admin_default' : directoryUser?.id || 'user_unknown',
+          email: normalizedEmail,
+          name: isAdmin ? 'Quản trị viên' : directoryUser?.name || 'Người dùng',
+          role: isAdmin ? 'admin' : directoryUser?.role || 'user',
+          department: isAdmin ? 'IT Department' : directoryUser?.department || 'Chưa phân loại',
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
         }
 

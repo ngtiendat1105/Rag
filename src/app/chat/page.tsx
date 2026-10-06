@@ -30,7 +30,8 @@ export default function ChatPage() {
   const { 
     chats, 
     activeChatId, 
-    isTyping, 
+    isTyping,
+    processingStage,
     setActiveChat, 
     createNewChat, 
     sendMessage, 
@@ -61,8 +62,8 @@ export default function ChatPage() {
     router.push('/login')
   }
 
-  const handleSendMessage = async (content: string) => {
-    await sendMessage(content)
+  const handleSendMessage = async (content: string, attachments?: import('@/store/chatStore').ChatAttachment[]) => {
+    await sendMessage(content, attachments)
   }
 
   const handleNewChat = () => {
@@ -264,7 +265,7 @@ export default function ChatPage() {
                   />
                 ))}
                 
-                {isTyping && <TypingIndicator />}
+                {isTyping && <TypingIndicator message={processingStage} />}
                 <div ref={messagesEndRef} />
               </div>
             </div>

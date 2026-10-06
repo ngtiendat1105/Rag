@@ -95,14 +95,10 @@ export default function ChatHistorySidebar({
       </button>
 
       {/* Sidebar */}
-      <motion.div
-        initial={false}
-        animate={{ 
-          x: showMobile ? 0 : -320,
-          opacity: showMobile ? 1 : 0
-        }}
+      <div
         className={`fixed lg:relative inset-y-0 left-0 z-30 w-80 glass-effect border-r border-dark-border
-          flex flex-col ${className} lg:translate-x-0 transition-transform`}
+          ${showMobile ? 'flex translate-x-0 opacity-100' : 'hidden -translate-x-full opacity-0'} lg:flex lg:translate-x-0 lg:opacity-100
+          flex-col ${className} transition-all duration-300`}
       >
         {/* Header */}
         <div className="p-6 border-b border-dark-border">
@@ -281,7 +277,7 @@ export default function ChatHistorySidebar({
             </button>
           </div>
         </div>
-      </motion.div>
+      </div>
 
       {/* Mobile overlay */}
       {showMobile && (

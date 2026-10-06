@@ -17,6 +17,7 @@ import {
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDate } from '@/utils/formatters'
+import type { ChatAttachment, ChatReference } from '@/store/chatStore'
 
 interface ChatMessageProps {
   id: string
@@ -24,7 +25,9 @@ interface ChatMessageProps {
   content: string
   timestamp: string
   status?: 'sending' | 'sent' | 'error'
-  references?: string[]
+  references?: Array<string | ChatReference>
+  confidence?: number
+  attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
   onRate?: (rating: 'like' | 'dislike') => void
   onCopy?: () => void
@@ -37,12 +40,17 @@ export default function ChatMessage({
   timestamp,
   status = 'sent',
   references = [],
+  confidence,
+  attachments = [],
   rating = null,
   onRate,
   onCopy,
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [showReferences, setShowReferences] = useState(false)
+  const [selectedReference, setSelectedReference] = useState<ChatReference | null>(null)
+  const [showFeedback, setShowFeedback] = useState(false)
+  const [feedbackSent, setFeedbackSent] = useState(false)
 
   const handleCopy = () => {
     navigator.clipboard.writeText(content)
@@ -139,6 +147,17 @@ export default function ChatMessage({
               <p className="text-white whitespace-pre-wrap">{content}</p>
             )}
 
+            {isUser && attachments.length > 0 && (
+              <div className="mt-3 flex flex-wrap gap-2">{attachments.map(file => <span key={file.id} className="flex items-center gap-1.5 rounded-lg bg-black/15 px-2.5 py-1.5 text-xs"><FileText className="h-3.5 w-3.5" />{file.name}</span>)}</div>
+            )}
+
+            {isAI && typeof confidence === 'number' && (
+              <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${confidence >= 75 ? 'bg-green-500/10 text-green-300' : 'bg-yellow-500/10 text-yellow-200'}`}>
+                <span className={`h-2 w-2 rounded-full ${confidence >= 75 ? 'bg-green-400' : 'bg-yellow-300'}`} />
+                Độ tin cậy {confidence}%{confidence < 75 && ' — nên kiểm tra lại nguồn trước khi sử dụng.'}
+              </div>
+            )}
+
             {/* References section */}
             {isAI && references.length > 0 && (
               <div className="mt-4 pt-4 border-t border-dark-border/30">
@@ -156,17 +175,20 @@ export default function ChatMessage({
                     animate={{ opacity: 1, height: 'auto' }}
                     className="mt-3 space-y-2"
                   >
-                    {references.map((ref, index) => (
-                      <div
+                    {references.map((ref, index) => {
+                      const item = typeof ref === 'string' ? { title: ref } : ref
+                      return <button
                         key={index}
-                        className="flex items-center gap-2 text-sm text-gray-300 bg-dark-bg/50 p-2 rounded-lg"
+                        onClick={() => setSelectedReference(item)}
+                        className="flex w-full items-center gap-2 rounded-lg bg-dark-bg/50 p-3 text-left text-sm text-gray-300 hover:bg-dark-bg"
                       >
                         <ExternalLink className="w-3 h-3" />
-                        <span>{ref}</span>
-                      </div>
-                    ))}
+                        <span className="flex-1">{item.title}{item.page ? ` · Trang ${item.page}` : ''}</span>
+                      </button>
+                    })}
                   </motion.div>
                 )}
+                {selectedReference && <div className="mt-3 rounded-xl border border-accent-500/20 bg-accent-500/5 p-3 text-sm"><div className="mb-1 flex items-center justify-between"><strong>{selectedReference.title}</strong><button aria-label="Đóng nguồn" onClick={() => setSelectedReference(null)}><X className="h-4 w-4" /></button></div>{selectedReference.page && <p className="text-xs text-gray-400">Trang {selectedReference.page}</p>}<p className="mt-2 text-gray-300">{selectedReference.excerpt || 'Bản xem trước chưa có sẵn cho tài liệu này.'}</p></div>}
               </div>
             )}
           </div>
@@ -199,7 +221,7 @@ export default function ChatMessage({
               </button>
 
               <button
-                onClick={() => onRate?.('dislike')}
+                onClick={() => { onRate?.('dislike'); setShowFeedback(true); setFeedbackSent(false) }}
                 className={`p-2 rounded-lg transition-colors ${rating === 'dislike' ? 'bg-red-500/20 text-red-400' : 'hover:bg-dark-surface text-gray-400'}`}
                 title="Không thích"
               >
@@ -207,6 +229,10 @@ export default function ChatMessage({
               </button>
             </motion.div>
           )}
+          {isAI && showFeedback && !feedbackSent && (
+            <div className="mt-2 rounded-xl border border-white/10 bg-dark-surface/70 p-3 text-sm"><p className="mb-2 text-gray-300">Câu trả lời cần cải thiện ở điểm nào?</p><div className="flex flex-wrap gap-2">{['Sai nội dung', 'Thiếu nguồn', 'Khó hiểu', 'Không liên quan'].map(reason => <button key={reason} onClick={() => { setFeedbackSent(true); setShowFeedback(false) }} className="rounded-lg border border-white/10 px-3 py-1.5 text-gray-300 hover:bg-white/5">{reason}</button>)}</div></div>
+          )}
+          {isAI && feedbackSent && <p className="mt-2 text-xs text-green-400">Đã ghi nhận phản hồi. Cảm ơn bạn.</p>}
         </div>
       </div>
     </motion.div>

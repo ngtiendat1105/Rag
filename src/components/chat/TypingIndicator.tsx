@@ -10,7 +10,7 @@ interface TypingIndicatorProps {
 
 export default function TypingIndicator({
   isTyping = true,
-  message = 'Legal AI Assistant đang soạn câu trả lời...',
+  message = 'Đang tìm tài liệu liên quan...',
 }: TypingIndicatorProps) {
   if (!isTyping) return null
 

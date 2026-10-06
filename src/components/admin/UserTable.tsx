@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Search, 
@@ -19,17 +19,7 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
-
-interface User {
-  id: string
-  name: string
-  email: string
-  role: 'admin' | 'user' | 'moderator'
-  department: string
-  status: 'active' | 'inactive' | 'pending'
-  lastActive: string
-  avatar?: string
-}
+import { DEFAULT_DIRECTORY_USERS, DIRECTORY_STORAGE_KEY, DirectoryUser as User } from '@/utils/demoUserDirectory'
 
 export default function UserTable() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -37,17 +27,24 @@ export default function UserTable() {
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [showAddModal, setShowAddModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [users, setUsers] = useState<User[]>([
-    { id: '1', name: 'Nguyễn Văn A', email: 'a.nguyen@company.com', role: 'admin', department: 'IT Department', status: 'active', lastActive: '2024-01-15T09:30:00' },
-    { id: '2', name: 'Trần Thị B', email: 'b.tran@company.com', role: 'user', department: 'Phòng Pháp chế', status: 'active', lastActive: '2024-01-15T08:45:00' },
-    { id: '3', name: 'Lê Văn C', email: 'c.le@company.com', role: 'user', department: 'Phòng Nhân sự', status: 'inactive', lastActive: '2024-01-14T15:20:00' },
-    { id: '4', name: 'Phạm Thị D', email: 'd.pham@company.com', role: 'moderator', department: 'Ban Giám đốc', status: 'active', lastActive: '2024-01-15T10:15:00' },
-    { id: '5', name: 'Hoàng Văn E', email: 'e.hoang@company.com', role: 'user', department: 'Phòng Kế toán', status: 'pending', lastActive: '2024-01-13T14:30:00' },
-    { id: '6', name: 'Vũ Thị F', email: 'f.vu@company.com', role: 'user', department: 'Phòng Kinh doanh', status: 'active', lastActive: '2024-01-15T11:45:00' },
-    { id: '7', name: 'Đặng Văn G', email: 'g.dang@company.com', role: 'user', department: 'IT Department', status: 'active', lastActive: '2024-01-15T13:20:00' },
-    { id: '8', name: 'Bùi Thị H', email: 'h.bui@company.com', role: 'moderator', department: 'Phòng Pháp chế', status: 'inactive', lastActive: '2024-01-12T16:55:00' },
-  ])
+  const [users, setUsers] = useState<User[]>(DEFAULT_DIRECTORY_USERS)
+  const [directoryLoaded, setDirectoryLoaded] = useState(false)
+  const [addError, setAddError] = useState('')
+  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'user' as User['role'], department: 'Phòng Pháp chế' })
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem(DIRECTORY_STORAGE_KEY)
+      if (saved) setUsers(JSON.parse(saved))
+    } catch {}
+    setDirectoryLoaded(true)
+  }, [])
+
+  useEffect(() => {
+    if (directoryLoaded) localStorage.setItem(DIRECTORY_STORAGE_KEY, JSON.stringify(users))
+  }, [users, directoryLoaded])
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
@@ -110,16 +107,33 @@ export default function UserTable() {
   }
 
   const handleAddUser = () => {
-    const newUser: User = {
+    setAddError('')
+    setShowAddModal(true)
+  }
+
+  const confirmAddUser = (event: React.FormEvent) => {
+    event.preventDefault()
+    const email = newUser.email.trim().toLowerCase()
+    if (!newUser.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+      setAddError('Vui lòng nhập đầy đủ họ tên và email hợp lệ.')
+      return
+    }
+    if (users.some(user => user.email.toLowerCase() === email)) {
+      setAddError('Email này đã tồn tại trong hệ thống.')
+      return
+    }
+    const createdUser: User = {
       id: `user_${Date.now()}`,
-      name: 'New User',
-      email: `user${users.length + 1}@company.com`,
-      role: 'user',
-      department: 'New Department',
-      status: 'pending',
+      name: newUser.name.trim(),
+      email,
+      role: newUser.role,
+      department: newUser.department,
+      status: 'active',
       lastActive: new Date().toISOString()
     }
-    setUsers([newUser, ...users])
+    setUsers(current => [createdUser, ...current])
+    setNewUser({ name: '', email: '', role: 'user', department: 'Phòng Pháp chế' })
+    setShowAddModal(false)
   }
 
   return (
@@ -283,6 +297,21 @@ export default function UserTable() {
           </table>
         </div>
       </div>
+
+      {/* Edit Modal */}
+      <Modal isOpen={showAddModal} onClose={() => setShowAddModal(false)} title="Thêm người dùng" size="lg">
+        <form onSubmit={confirmAddUser} className="space-y-5">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Họ và tên</span><input autoFocus required value={newUser.name} onChange={e => setNewUser(current => ({ ...current, name: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3" placeholder="Nguyễn Văn A" /></label>
+            <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Email</span><input required type="email" value={newUser.email} onChange={e => setNewUser(current => ({ ...current, email: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3" placeholder="user@company.com" /></label>
+            <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Vai trò</span><select value={newUser.role} onChange={e => setNewUser(current => ({ ...current, role: e.target.value as User['role'] }))} className="glass-effect-light w-full rounded-xl px-4 py-3"><option className="bg-dark-surface" value="user">User</option><option className="bg-dark-surface" value="moderator">Moderator</option><option className="bg-dark-surface" value="admin">Admin</option></select></label>
+            <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Phòng ban</span><select value={newUser.department} onChange={e => setNewUser(current => ({ ...current, department: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3"><option className="bg-dark-surface">Phòng Pháp chế</option><option className="bg-dark-surface">Phòng Nhân sự</option><option className="bg-dark-surface">Phòng Kế toán</option><option className="bg-dark-surface">Phòng Kinh doanh</option><option className="bg-dark-surface">IT Department</option><option className="bg-dark-surface">Ban Giám đốc</option></select></label>
+          </div>
+          <div className="rounded-xl bg-primary-500/10 p-4 text-sm text-primary-200">Tài khoản được kích hoạt ngay với mật khẩu tạm <strong>password123</strong>. Người dùng xác minh OTP bằng email khi đăng nhập.</div>
+          {addError && <p role="alert" className="text-sm text-red-400">{addError}</p>}
+          <div className="flex justify-end gap-3"><Button type="button" variant="ghost" onClick={() => setShowAddModal(false)}>Hủy</Button><Button type="submit" variant="primary">Tạo tài khoản</Button></div>
+        </form>
+      </Modal>
 
       {/* Edit Modal */}
       <Modal

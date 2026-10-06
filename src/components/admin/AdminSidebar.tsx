@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
-import { motion } from 'framer-motion'
 import { 
   LayoutDashboard, 
   Users, 
@@ -53,7 +52,7 @@ export default function AdminSidebar() {
   }
 
   const isActive = (path: string) => {
-    return pathname === path || pathname?.startsWith(`${path}/`)
+    return pathname === path || (path !== '/admin' && pathname?.startsWith(`${path}/`))
   }
 
   return (
@@ -67,13 +66,9 @@ export default function AdminSidebar() {
       </button>
 
       {/* Sidebar */}
-      <motion.div
-        initial={false}
-        animate={{ 
-          x: showMobile ? 0 : -320,
-          opacity: showMobile ? 1 : 0
-        }}
-        className={`fixed lg:relative inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-64'} 
+      <div
+        className={`fixed lg:relative inset-y-0 left-0 z-40 ${collapsed ? 'w-20' : 'w-64'}
+          ${showMobile ? 'translate-x-0 opacity-100' : '-translate-x-full opacity-0'} lg:translate-x-0 lg:opacity-100
           glass-effect border-r border-dark-border flex flex-col transition-all duration-300`}
       >
         {/* Header */}
@@ -166,7 +161,7 @@ export default function AdminSidebar() {
             {!collapsed && <span className="font-medium">Đăng xuất</span>}
           </button>
         </div>
-      </motion.div>
+      </div>
 
       {/* Mobile overlay */}
       {showMobile && (

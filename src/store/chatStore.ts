@@ -1,6 +1,20 @@
 import { create } from 'zustand'
 import { SAMPLE_CHATS, DEMO_MESSAGES } from '@/utils/constants'
 import { generateChatId } from '@/utils/formatters'
+import { ContentModerationError, moderateChatContent } from '@/utils/contentModeration'
+
+export interface ChatAttachment {
+  id: string
+  name: string
+  size: number
+  type: string
+}
+
+export interface ChatReference {
+  title: string
+  page?: number
+  excerpt?: string
+}
 
 interface Message {
   id: string
@@ -8,7 +22,9 @@ interface Message {
   content: string
   timestamp: string
   status?: 'sending' | 'sent' | 'error'
-  references?: string[]
+  references?: Array<string | ChatReference>
+  confidence?: number
+  attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
 }
 
@@ -27,11 +43,12 @@ interface ChatState {
   activeChatId: string | null
   isTyping: boolean
   isLoading: boolean
+  processingStage: string
   
   // Actions
   setActiveChat: (chatId: string) => void
   createNewChat: (title?: string) => Chat
-  sendMessage: (content: string) => Promise<void>
+  sendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>
   deleteChat: (chatId: string) => void
   archiveChat: (chatId: string) => void
   rateMessage: (messageId: string, rating: 'like' | 'dislike') => void
@@ -48,6 +65,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   activeChatId: 'chat_1',
   isTyping: false,
   isLoading: false,
+  processingStage: '',
 
   setActiveChat: (chatId: string) => {
     set({ activeChatId: chatId })
@@ -72,9 +90,14 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return newChat
   },
 
-  sendMessage: async (content: string) => {
+  sendMessage: async (content: string, attachments = []) => {
     const { activeChatId, chats } = get()
     if (!activeChatId || !content.trim()) return
+
+    const moderation = moderateChatContent(content)
+    if (!moderation.allowed) {
+      throw new ContentModerationError(moderation.message || 'Nội dung không phù hợp.')
+    }
 
     const userMessage: Message = {
       id: `msg_${Date.now()}_user`,
@@ -82,6 +105,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       content: content.trim(),
       timestamp: new Date().toISOString(),
       status: 'sending' as const,
+      attachments,
     }
 
     // Update chat with user message
@@ -97,15 +121,23 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : chat
       ),
       isTyping: true,
+      processingStage: attachments.length ? 'Đang đọc tài liệu đính kèm...' : 'Đang tìm tài liệu liên quan...',
     }))
 
-    // Simulate AI response
-    await new Promise(resolve => setTimeout(resolve, 1500))
+    await new Promise(resolve => setTimeout(resolve, 500))
+    set({ processingStage: 'Đang đánh giá độ phù hợp của nguồn...' })
+    await new Promise(resolve => setTimeout(resolve, 500))
+    set({ processingStage: 'Đang tổng hợp câu trả lời...' })
+    await new Promise(resolve => setTimeout(resolve, 500))
 
     const aiResponse: Message = {
       id: `msg_${Date.now()}_ai`,
       role: 'assistant',
-      content: `Đây là phản hồi từ AI về câu hỏi "${content}". Tôi đã phân tích và tìm thấy các tài liệu liên quan. 
+      content: attachments.length > 0
+        ? `Tôi đã nhận ${attachments.length} tệp đính kèm (${attachments.map(file => file.name).join(', ')}).
+
+**Lưu ý:** Bản demo hiện lưu thông tin tệp trong cuộc trò chuyện nhưng chưa trích xuất nội dung tệp. Cần kết nối dịch vụ upload và xử lý tài liệu để tôi có thể tóm tắt hoặc kiểm tra điều khoản bên trong.`
+        : `Đây là phản hồi từ AI về câu hỏi "${content}". Tôi đã phân tích và tìm thấy các tài liệu liên quan.
       
 **Thông tin pháp lý liên quan:**
 - Điều 15 Bộ luật Lao động
@@ -114,7 +146,11 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
 **Gợi ý tiếp theo:** Bạn có muốn tôi tìm hiểu thêm về vấn đề cụ thể nào không?`,
       timestamp: new Date().toISOString(),
-      references: ['Điều 15 Bộ luật Lao động', 'Nghị định 145/2020/NĐ-CP'],
+      references: attachments.length ? [] : [
+        { title: 'Bộ luật Lao động 2019', page: 12, excerpt: 'Điều 15 quy định về hợp đồng lao động và hình thức giao kết.' },
+        { title: 'Nghị định 145/2020/NĐ-CP', page: 8, excerpt: 'Quy định chi tiết và hướng dẫn thi hành một số điều của Bộ luật Lao động.' },
+      ],
+      confidence: attachments.length ? 35 : 88,
     }
 
     // Update chat with AI response
@@ -132,6 +168,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
           : chat
       ),
       isTyping: false,
+      processingStage: '',
     }))
   },
 
