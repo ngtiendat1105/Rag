@@ -8,8 +8,8 @@ import Button from '@/components/ui/Button'
 import { useRouter } from 'next/navigation'
 
 interface LoginFormProps {
-  onLoginSuccess?: (email: string) => void
-  onShowOTP?: (email: string) => void
+  onLoginSuccess?: (email: string, password: string) => void | Promise<void>
+  onShowOTP?: (email: string, password: string) => void | Promise<void>
 }
 
 export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps) {
@@ -28,9 +28,6 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
     setLoading(true)
     setErrors({})
 
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1500))
-
     // Validate
     const newErrors: Record<string, string> = {}
     if (!formData.email) newErrors.email = 'Vui lòng nhập email'
@@ -43,17 +40,17 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
       return
     }
 
-    // Simulate successful login
-    console.log('Login attempt:', formData)
-    
-    // Show OTP form
-    if (onShowOTP) {
-      onShowOTP(formData.email)
-    } else if (onLoginSuccess) {
-      onLoginSuccess(formData.email)
+    try {
+      if (onShowOTP) {
+        await onShowOTP(formData.email, formData.password)
+      } else if (onLoginSuccess) {
+        await onLoginSuccess(formData.email, formData.password)
+      }
+    } catch (error) {
+      setErrors({ submit: error instanceof Error ? error.message : 'Không thể gửi mã OTP.' })
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   const handleChange = (field: string, value: string) => {
@@ -168,6 +165,8 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         </button>
       </div>
 
+      {errors.submit && <p role="alert" className="text-sm text-red-400">{errors.submit}</p>}
+
       <Button
         type="submit"
         variant="primary"
@@ -197,7 +196,7 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         <div className="grid grid-cols-2 gap-2">
           <div>
             <span className="text-gray-400">User:</span>
-            <span className="ml-2 text-gray-300">user@company.com</span>
+            <span className="ml-2 break-all text-gray-300">ngtiendatt1105@gmail.com</span>
           </div>
           <div>
             <span className="text-gray-400">Pass:</span>
@@ -205,7 +204,7 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
           </div>
           <div>
             <span className="text-gray-400">Admin:</span>
-            <span className="ml-2 text-gray-300">admin@company.com</span>
+            <span className="ml-2 break-all text-gray-300">ngtiendatt1105@gmail.com</span>
           </div>
           <div>
             <span className="text-gray-400">Pass:</span>

@@ -8,15 +8,20 @@ import LoginForm from '@/components/auth/LoginForm'
 import OTPVerification from '@/components/auth/OTPVerification'
 import Button from '@/components/ui/Button'
 import { ArrowLeft, Shield } from 'lucide-react'
+import { useAuthStore } from '@/store/authStore'
+import { requestOtp } from '@/services/otp'
 
 export default function LoginPage() {
   const router = useRouter()
   const [showOTP, setShowOTP] = useState(false)
   const [userEmail, setUserEmail] = useState('')
+  const [userPassword, setUserPassword] = useState('')
   const [step, setStep] = useState(1) // 1: Login, 2: OTP
 
-  const handleLoginSuccess = (email: string) => {
+  const handleLoginSuccess = async (email: string, password: string) => {
+    await requestOtp('send', email)
     setUserEmail(email)
+    setUserPassword(password)
     setShowOTP(true)
     setStep(2)
   }
@@ -27,32 +32,26 @@ export default function LoginPage() {
   }
 
   const handleVerifyOTP = async (otp: string) => {
-    console.log('Verifying OTP:', otp)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
-    
-    // Check if user is admin or regular user
-    const isAdmin = userEmail.toLowerCase().includes('admin')
-    
-    // Navigate based on user role
-    if (isAdmin) {
-      router.push('/admin')
-    } else {
-      router.push('/chat')
+    if (!/^\d{6}$/.test(otp)) {
+      throw new Error('OTP phải gồm 6 chữ số')
     }
+    await requestOtp('verify', userEmail, otp)
+
+    // Complete the existing demo session only after OTP verification.
+    await useAuthStore.getState().login(userEmail.trim().toLowerCase(), userPassword)
+    const user = useAuthStore.getState().user
+    router.replace(user?.role === 'admin' ? '/admin' : '/chat')
   }
 
   const handleResendCode = async () => {
-    console.log('Resending code to:', userEmail)
-    // Simulate API call
-    await new Promise(resolve => setTimeout(resolve, 1000))
+    await requestOtp('send', userEmail)
   }
 
   return (
     <div className="relative min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-dark-bg via-dark-bg/90 to-dark-bg">
       {/* Animated Canvas Background */}
       <SimpleBackground />
-      
+
       {/* Glassmorphism Card */}
       <motion.div
         initial={{ opacity: 0, scale: 0.9 }}
@@ -77,7 +76,7 @@ export default function LoginPage() {
                   </p>
                 </div>
               </div>
-              
+
               <div className="flex items-center gap-2">
                 <div className="w-2 h-2 rounded-full bg-white/30" />
                 <div className="w-2 h-2 rounded-full bg-white/60" />
@@ -85,7 +84,7 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Progress Steps */}
           <div className="p-6 border-b border-dark-border">
             <div className="flex items-center justify-center gap-8">
@@ -96,9 +95,9 @@ export default function LoginPage() {
                 </div>
                 <span className="font-medium">Đăng nhập</span>
               </div>
-              
+
               <div className="flex-1 h-1 bg-dark-border" />
-              
+
               <div className={`flex items-center gap-3 ${step >= 2 ? 'text-primary-400' : 'text-gray-500'}`}>
                 <div className={`w-10 h-10 rounded-full flex items-center justify-center
                   ${step >= 2 ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-surface border border-dark-border'}`}>
@@ -108,13 +107,13 @@ export default function LoginPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Main Content */}
           <div className="p-8">
             {!showOTP ? (
-              <LoginForm 
-                onLoginSuccess={(email: string) => handleLoginSuccess(email)}
-                onShowOTP={(email: string) => handleLoginSuccess(email)}
+              <LoginForm
+                onLoginSuccess={handleLoginSuccess}
+                onShowOTP={handleLoginSuccess}
               />
             ) : (
               <OTPVerification
@@ -125,7 +124,7 @@ export default function LoginPage() {
               />
             )}
           </div>
-          
+
           {/* Footer */}
           <div className="p-6 border-t border-dark-border">
             <div className="flex items-center justify-between">
@@ -136,7 +135,7 @@ export default function LoginPage() {
               >
                 Trang chủ
               </Button>
-              
+
               <div className="text-sm text-gray-400">
                 Phiên bản 1.0.0 • Bảo mật cấp doanh nghiệp
               </div>
@@ -144,7 +143,7 @@ export default function LoginPage() {
           </div>
         </div>
       </motion.div>
-      
+
       {/* Decorative elements */}
       <div className="absolute top-10 left-10 w-72 h-72 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-full blur-3xl" />
       <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-r from-neon-cyan/5 to-neon-purple/5 rounded-full blur-3xl" />

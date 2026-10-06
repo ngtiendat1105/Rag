@@ -38,8 +38,7 @@ export function useAuth() {
       // const response = await authService.login(credentials.email, credentials.password)
       // storeLogin(response.data.user)
       
-      // Determine redirect based on role (admin emails contain 'admin')
-      const redirectPath = credentials.email.includes('admin') ? '/admin' : '/chat'
+      const redirectPath = useAuthStore.getState().user?.role === 'admin' ? '/admin' : '/chat'
       router.push(redirectPath)
     } catch (err: any) {
       setError(err.message || 'Đăng nhập thất bại')
@@ -66,8 +65,7 @@ export function useAuth() {
       // Mock login to set user data based on email
       await storeLogin(credentials.email, 'demo-password')
       
-      // Determine redirect based on role (admin emails contain 'admin')
-      const redirectPath = credentials.email.includes('admin') ? '/admin' : '/chat'
+      const redirectPath = useAuthStore.getState().user?.role === 'admin' ? '/admin' : '/chat'
       router.push(redirectPath)
     } catch (err: any) {
       setError(err.message || 'Xác thực OTP thất bại')

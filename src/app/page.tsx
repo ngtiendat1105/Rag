@@ -9,9 +9,26 @@ export default function HomePage() {
     <div className="relative min-h-screen bg-gradient-to-b from-dark-bg via-dark-bg/90 to-dark-bg">
       {/* Animated Canvas Background */}
       <SimpleBackground />
+
+      <header className="relative z-20 border-b border-white/10 bg-dark-bg/70 backdrop-blur-xl">
+        <nav aria-label="Điều hướng chính" className="container mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4 sm:px-6">
+          <Link href="/" aria-label="Legal AI — Trang chủ" className="flex shrink-0 items-center gap-2 rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">
+            <Shield aria-hidden="true" className="h-7 w-7 text-primary-400" />
+            <span className="text-base font-bold sm:text-xl">Legal AI</span>
+          </Link>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Link href="/login" className="inline-flex min-h-[44px] items-center justify-center rounded-xl border border-white/15 px-3 text-sm font-semibold text-gray-200 transition-colors hover:bg-white/10 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 sm:px-5">
+              Đăng nhập
+            </Link>
+            <Link href="/register" className="inline-flex min-h-[44px] items-center justify-center rounded-xl bg-gradient-to-r from-primary-600 to-secondary-600 px-3 text-sm font-semibold text-white shadow-lg shadow-primary-500/20 transition-colors hover:from-primary-500 hover:to-secondary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400 focus-visible:ring-offset-2 focus-visible:ring-offset-dark-bg sm:px-5">
+              Đăng ký
+            </Link>
+          </div>
+        </nav>
+      </header>
       
       {/* Main Content */}
-      <div className="relative z-10 container mx-auto px-6 py-16">
+      <main className="relative z-10 container mx-auto px-4 py-10 sm:px-6 sm:py-16">
         <div className="max-w-6xl mx-auto">
           {/* Header with Logo */}
           <div className="flex flex-col items-center justify-center mb-16">
@@ -19,7 +36,7 @@ export default function HomePage() {
               <RotatingLogo />
             </div>
             
-            <h1 className="text-5xl md:text-7xl font-bold text-center mb-6">
+            <h1 className="text-4xl sm:text-5xl md:text-7xl font-bold text-center mb-6">
               <span className="gradient-text">Legal AI</span> 
               <span className="block mt-2">Enterprise Chatbot</span>
             </h1>
@@ -38,9 +55,9 @@ export default function HomePage() {
                 <ArrowRight className="w-5 h-5 group-hover:translate-x-2 transition-transform" />
               </Link>
               
-              <button className="glass-effect px-8 py-4 rounded-xl flex items-center gap-3 hover:scale-105 transition-all duration-300">
-                <span className="text-lg font-semibold">Xem Demo</span>
-              </button>
+              <Link href="/login" className="glass-effect px-8 py-4 rounded-xl flex items-center gap-3 hover:scale-105 transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">
+                <span className="text-lg font-semibold">Dùng thử demo</span>
+              </Link>
             </div>
           </div>
 
@@ -108,7 +125,7 @@ export default function HomePage() {
             <p className="text-sm">Được phát triển bởi đội ngũ chuyên gia Full-Stack & AI</p>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   )
 }

@@ -15,6 +15,7 @@ import {
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useAuthStore } from '@/store/authStore'
+import { useAuthHydrated } from '@/hooks/useAuthHydrated'
 import { useChatStore } from '@/store/chatStore'
 import ChatHistorySidebar from '@/components/chat/ChatHistorySidebar'
 import ChatMessage from '@/components/chat/ChatMessage'
@@ -24,6 +25,7 @@ import Button from '@/components/ui/Button'
 
 export default function ChatPage() {
   const router = useRouter()
+  const authHydrated = useAuthHydrated()
   const { user, logout, isAuthenticated } = useAuthStore()
   const { 
     chats, 
@@ -43,10 +45,11 @@ export default function ChatPage() {
   const activeChat = activeChatId ? chats.find(chat => chat.id === activeChatId) : null
 
   useEffect(() => {
+    if (!authHydrated) return
     if (!isAuthenticated) {
-      router.push('/login')
+      router.replace('/login')
     }
-  }, [isAuthenticated, router])
+  }, [authHydrated, isAuthenticated, router])
 
   useEffect(() => {
     // Scroll to bottom when new messages are added
@@ -82,7 +85,7 @@ export default function ChatPage() {
     URL.revokeObjectURL(url)
   }
 
-  if (!isAuthenticated || !user) {
+  if (!authHydrated || !isAuthenticated || !user) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

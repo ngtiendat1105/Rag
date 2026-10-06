@@ -112,7 +112,7 @@ export default function OTPVerification({
         setVerificationComplete(false)
       }, 2000)
     } catch (err) {
-      setError('Mã OTP không chính xác. Vui lòng thử lại.')
+      setError(err instanceof Error ? err.message : 'Mã OTP không chính xác. Vui lòng thử lại.')
     } finally {
       setLoading(false)
     }
@@ -126,7 +126,7 @@ export default function OTPVerification({
       await onResendCode()
       setCountdown(60)
     } catch (err) {
-      setError('Không thể gửi lại mã. Vui lòng thử lại sau.')
+      setError(err instanceof Error ? err.message : 'Không thể gửi lại mã. Vui lòng thử lại sau.')
     } finally {
       setResendLoading(false)
     }
@@ -136,7 +136,7 @@ export default function OTPVerification({
     const [localPart, domain] = email.split('@')
     if (!localPart || !domain) return email
     
-    const maskedLocal = localPart.charAt(0) + '*'.repeat(localPart.length - 2) + localPart.charAt(localPart.length - 1)
+    const maskedLocal = localPart.charAt(0) + '*'.repeat(Math.max(1, localPart.length - 2)) + (localPart.length > 1 ? localPart.charAt(localPart.length - 1) : '')
     return `${maskedLocal}@${domain}`
   }
 

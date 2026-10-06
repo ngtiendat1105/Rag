@@ -5,14 +5,17 @@ import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
 import { Users } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import { useAuthHydrated } from '@/hooks/useAuthHydrated'
 import AdminSidebar from '@/components/admin/AdminSidebar'
 import UserTable from '@/components/admin/UserTable'
 
 export default function AdminUsersPage() {
   const router = useRouter()
+  const authHydrated = useAuthHydrated()
   const { user, isAuthenticated } = useAuthStore()
 
   useEffect(() => {
+    if (!authHydrated) return
     if (!isAuthenticated) {
       router.push('/login')
       return
@@ -22,9 +25,9 @@ export default function AdminUsersPage() {
     if (user?.role !== 'admin') {
       router.push('/chat')
     }
-  }, [isAuthenticated, user, router])
+  }, [authHydrated, isAuthenticated, user, router])
 
-  if (!isAuthenticated || user?.role !== 'admin') {
+  if (!authHydrated || !isAuthenticated || user?.role !== 'admin') {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center">

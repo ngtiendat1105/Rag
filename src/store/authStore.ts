@@ -40,12 +40,13 @@ export const useAuthStore = create<AuthState>()(
         await new Promise(resolve => setTimeout(resolve, 1000))
         
         // Demo user data
+        const isAdmin = email.trim().toLowerCase() === 'ngtiendatt1105@gmail.com' && password === 'admin123'
         const demoUser: User = {
           id: 'user_123',
           email: email,
-          name: email.includes('admin') ? 'Quản trị viên' : 'Nguyễn Văn A',
-          role: email.includes('admin') ? 'admin' : 'user',
-          department: email.includes('admin') ? 'IT Department' : 'Phòng Pháp chế',
+          name: isAdmin ? 'Quản trị viên' : 'Nguyễn Văn A',
+          role: isAdmin ? 'admin' : 'user',
+          department: isAdmin ? 'IT Department' : 'Phòng Pháp chế',
           avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
         }
 
