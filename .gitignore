@@ -17,3 +17,17 @@ test_path/
 .vscode/
 .idea/
 *.log
+
+# Next.js / Node.js
+node_modules/
+.next/
+out/
+coverage/
+build/
+*.tsbuildinfo
+next-env.d.ts
+*.pem
+.vercel/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
