@@ -98,17 +98,9 @@ npm run build
 npm start
 ```
 
-## Demo Credentials
+## Tài khoản đăng nhập
 
-### User Login
-- **Email:** user@company.com
-- **Password:** password123
-- **Role:** User
-
-### Admin Login  
-- **Email:** admin@company.com
-- **Password:** admin123
-- **Role:** Admin
+Tài khoản được lưu trong Supabase và do quản trị viên tạo. Xem `SUPABASE_SETUP.md` để cấu hình cơ sở dữ liệu và tạo quản trị viên đầu tiên.
 
 ## Tính năng demo
 

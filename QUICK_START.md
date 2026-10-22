@@ -8,19 +8,9 @@ npm run dev
 
 Sau đó truy cập: http://localhost:3000
 
-## 📋 Test Credentials
+## 📋 Tài khoản đăng nhập
 
-### User Account (for Chat Interface)
-- **Email:** user@company.com
-- **Password:** password123
-- **Role:** User
-- **Department:** Phòng Pháp chế
-
-### Admin Account (for Admin Dashboard)
-- **Email:** admin@company.com  
-- **Password:** admin123
-- **Role:** Admin
-- **Department:** IT Department
+Ứng dụng không còn tài khoản demo mặc định. Hãy chạy `supabase/schema.sql`, tạo quản trị viên đầu tiên theo `SUPABASE_SETUP.md`, rồi dùng trang quản trị để thêm người dùng.
 
 ## 🔧 Available Routes
 

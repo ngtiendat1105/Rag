@@ -19,7 +19,7 @@ export default function LoginPage() {
   const [step, setStep] = useState(1) // 1: Login, 2: OTP
 
   const handleLoginSuccess = async (email: string, password: string) => {
-    await requestOtp('send', email)
+    await requestOtp('send', email, { password })
     setUserEmail(email)
     setUserPassword(password)
     setShowOTP(true)
@@ -35,16 +35,14 @@ export default function LoginPage() {
     if (!/^\d{6}$/.test(otp)) {
       throw new Error('OTP phải gồm 6 chữ số')
     }
-    await requestOtp('verify', userEmail, otp)
-
-    // Complete the existing demo session only after OTP verification.
-    await useAuthStore.getState().login(userEmail.trim().toLowerCase(), userPassword)
-    const user = useAuthStore.getState().user
+    const result = await requestOtp('verify', userEmail, { otp })
+    useAuthStore.getState().completeLogin(result.user)
+    const user = result.user
     router.replace(user?.role === 'admin' ? '/admin' : '/chat')
   }
 
   const handleResendCode = async () => {
-    await requestOtp('send', userEmail)
+    await requestOtp('send', userEmail, { password: userPassword })
   }
 
   return (

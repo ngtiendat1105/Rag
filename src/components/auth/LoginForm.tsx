@@ -185,33 +185,6 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         </p>
       </div>
 
-      {/* Demo credentials */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 1 }}
-        className="glass-effect p-4 rounded-xl text-sm"
-      >
-        <p className="font-semibold text-gray-300 mb-2">Demo Credentials:</p>
-        <div className="grid grid-cols-2 gap-2">
-          <div>
-            <span className="text-gray-400">User:</span>
-            <span className="ml-2 break-all text-gray-300">ngtiendatt1105@gmail.com</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Pass:</span>
-            <span className="ml-2 text-gray-300">password123</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Admin:</span>
-            <span className="ml-2 break-all text-gray-300">ngtiendatt1105@gmail.com</span>
-          </div>
-          <div>
-            <span className="text-gray-400">Pass:</span>
-            <span className="ml-2 text-gray-300">admin123</span>
-          </div>
-        </div>
-      </motion.div>
     </motion.form>
   )
 }

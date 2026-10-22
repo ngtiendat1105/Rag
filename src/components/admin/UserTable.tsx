@@ -19,7 +19,7 @@ import {
 } from 'lucide-react'
 import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
-import { DEFAULT_DIRECTORY_USERS, DIRECTORY_STORAGE_KEY, DirectoryUser as User } from '@/utils/demoUserDirectory'
+import type { AppUser as User } from '@/lib/supabaseUsers'
 
 export default function UserTable() {
   const [searchQuery, setSearchQuery] = useState('')
@@ -29,22 +29,20 @@ export default function UserTable() {
   const [showDeleteModal, setShowDeleteModal] = useState(false)
   const [showAddModal, setShowAddModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<User | null>(null)
-  const [users, setUsers] = useState<User[]>(DEFAULT_DIRECTORY_USERS)
-  const [directoryLoaded, setDirectoryLoaded] = useState(false)
+  const [users, setUsers] = useState<User[]>([])
+  const [loading, setLoading] = useState(true)
+  const [operationError, setOperationError] = useState('')
   const [addError, setAddError] = useState('')
-  const [newUser, setNewUser] = useState({ name: '', email: '', role: 'user' as User['role'], department: 'Phòng Pháp chế' })
+  const [newUser, setNewUser] = useState({ name: '', email: '', password: '', role: 'user' as User['role'], department: 'Phòng Pháp chế' })
+  const [editUser, setEditUser] = useState({ name: '', email: '', role: 'user' as User['role'], department: '', status: 'active' as User['status'] })
 
   useEffect(() => {
-    try {
-      const saved = localStorage.getItem(DIRECTORY_STORAGE_KEY)
-      if (saved) setUsers(JSON.parse(saved))
-    } catch {}
-    setDirectoryLoaded(true)
+    fetch('/api/users').then(async response => {
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message)
+      setUsers(data.users)
+    }).catch(error => setOperationError(error.message || 'Không thể tải người dùng.')).finally(() => setLoading(false))
   }, [])
-
-  useEffect(() => {
-    if (directoryLoaded) localStorage.setItem(DIRECTORY_STORAGE_KEY, JSON.stringify(users))
-  }, [users, directoryLoaded])
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
@@ -90,6 +88,8 @@ export default function UserTable() {
 
   const handleEdit = (user: User) => {
     setSelectedUser(user)
+    setEditUser({ name: user.name, email: user.email, role: user.role, department: user.department, status: user.status })
+    setOperationError('')
     setShowEditModal(true)
   }
 
@@ -98,11 +98,16 @@ export default function UserTable() {
     setShowDeleteModal(true)
   }
 
-  const confirmDelete = () => {
+  const confirmDelete = async () => {
     if (selectedUser) {
-      setUsers(users.filter(u => u.id !== selectedUser.id))
-      setShowDeleteModal(false)
-      setSelectedUser(null)
+      try {
+        const response = await fetch(`/api/users?id=${encodeURIComponent(selectedUser.id)}`, { method: 'DELETE' })
+        const data = response.status === 204 ? null : await response.json()
+        if (!response.ok) throw new Error(data?.message || 'Không thể xóa người dùng.')
+        setUsers(current => current.filter(user => user.id !== selectedUser.id))
+        setShowDeleteModal(false)
+        setSelectedUser(null)
+      } catch (error) { setOperationError(error instanceof Error ? error.message : 'Không thể xóa người dùng.') }
     }
   }
 
@@ -111,7 +116,7 @@ export default function UserTable() {
     setShowAddModal(true)
   }
 
-  const confirmAddUser = (event: React.FormEvent) => {
+  const confirmAddUser = async (event: React.FormEvent) => {
     event.preventDefault()
     const email = newUser.email.trim().toLowerCase()
     if (!newUser.name.trim() || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
@@ -122,22 +127,32 @@ export default function UserTable() {
       setAddError('Email này đã tồn tại trong hệ thống.')
       return
     }
-    const createdUser: User = {
-      id: `user_${Date.now()}`,
-      name: newUser.name.trim(),
-      email,
-      role: newUser.role,
-      department: newUser.department,
-      status: 'active',
-      lastActive: new Date().toISOString()
-    }
-    setUsers(current => [createdUser, ...current])
-    setNewUser({ name: '', email: '', role: 'user', department: 'Phòng Pháp chế' })
-    setShowAddModal(false)
+    try {
+      const response = await fetch('/api/users', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newUser, email }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Không thể tạo tài khoản.')
+      setUsers(current => [data.user, ...current])
+      setNewUser({ name: '', email: '', password: '', role: 'user', department: 'Phòng Pháp chế' })
+      setShowAddModal(false)
+    } catch (error) { setAddError(error instanceof Error ? error.message : 'Không thể tạo tài khoản.') }
+  }
+
+  const confirmEdit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!selectedUser) return
+    try {
+      const response = await fetch('/api/users', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: selectedUser.id, user: editUser }) })
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.message || 'Không thể cập nhật người dùng.')
+      setUsers(current => current.map(user => user.id === selectedUser.id ? data.user : user))
+      setShowEditModal(false)
+      setSelectedUser(null)
+    } catch (error) { setOperationError(error instanceof Error ? error.message : 'Không thể cập nhật người dùng.') }
   }
 
   return (
     <div className="space-y-6">
+      {operationError && <div role="alert" className="rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">{operationError}</div>}
       {/* Header with actions */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
@@ -223,7 +238,7 @@ export default function UserTable() {
             </thead>
             
             <tbody>
-              {filteredUsers.map((user) => (
+              {!loading && filteredUsers.map((user) => (
                 <motion.tr
                   key={user.id}
                   initial={{ opacity: 0 }}
@@ -261,10 +276,10 @@ export default function UserTable() {
                   
                   <td className="p-4">
                     <div className="text-sm text-gray-300">
-                      {new Date(user.lastActive).toLocaleDateString('vi-VN')}
+                      {user.lastActive ? new Date(user.lastActive).toLocaleDateString('vi-VN') : 'Chưa đăng nhập'}
                     </div>
                     <div className="text-xs text-gray-400">
-                      {new Date(user.lastActive).toLocaleTimeString('vi-VN')}
+                      {user.lastActive ? new Date(user.lastActive).toLocaleTimeString('vi-VN') : ''}
                     </div>
                   </td>
                   
@@ -293,6 +308,7 @@ export default function UserTable() {
                   </td>
                 </motion.tr>
               ))}
+              {loading && <tr><td colSpan={6} className="p-10 text-center text-gray-400">Đang tải người dùng từ Supabase...</td></tr>}
             </tbody>
           </table>
         </div>
@@ -304,10 +320,11 @@ export default function UserTable() {
           <div className="grid gap-4 sm:grid-cols-2">
             <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Họ và tên</span><input autoFocus required value={newUser.name} onChange={e => setNewUser(current => ({ ...current, name: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3" placeholder="Nguyễn Văn A" /></label>
             <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Email</span><input required type="email" value={newUser.email} onChange={e => setNewUser(current => ({ ...current, email: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3" placeholder="user@company.com" /></label>
+            <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Mật khẩu tạm</span><input required minLength={8} type="password" value={newUser.password} onChange={e => setNewUser(current => ({ ...current, password: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3" placeholder="Ít nhất 8 ký tự" autoComplete="new-password" /></label>
             <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Vai trò</span><select value={newUser.role} onChange={e => setNewUser(current => ({ ...current, role: e.target.value as User['role'] }))} className="glass-effect-light w-full rounded-xl px-4 py-3"><option className="bg-dark-surface" value="user">User</option><option className="bg-dark-surface" value="moderator">Moderator</option><option className="bg-dark-surface" value="admin">Admin</option></select></label>
             <label className="space-y-2"><span className="text-sm font-medium text-gray-300">Phòng ban</span><select value={newUser.department} onChange={e => setNewUser(current => ({ ...current, department: e.target.value }))} className="glass-effect-light w-full rounded-xl px-4 py-3"><option className="bg-dark-surface">Phòng Pháp chế</option><option className="bg-dark-surface">Phòng Nhân sự</option><option className="bg-dark-surface">Phòng Kế toán</option><option className="bg-dark-surface">Phòng Kinh doanh</option><option className="bg-dark-surface">IT Department</option><option className="bg-dark-surface">Ban Giám đốc</option></select></label>
           </div>
-          <div className="rounded-xl bg-primary-500/10 p-4 text-sm text-primary-200">Tài khoản được kích hoạt ngay với mật khẩu tạm <strong>password123</strong>. Người dùng xác minh OTP bằng email khi đăng nhập.</div>
+          <div className="rounded-xl bg-primary-500/10 p-4 text-sm text-primary-200">Tài khoản được kích hoạt ngay. Hãy chuyển mật khẩu tạm cho người dùng qua kênh riêng; người dùng vẫn phải xác minh OTP khi đăng nhập.</div>
           {addError && <p role="alert" className="text-sm text-red-400">{addError}</p>}
           <div className="flex justify-end gap-3"><Button type="button" variant="ghost" onClick={() => setShowAddModal(false)}>Hủy</Button><Button type="submit" variant="primary">Tạo tài khoản</Button></div>
         </form>
@@ -321,13 +338,14 @@ export default function UserTable() {
         size="lg"
       >
         {selectedUser && (
-          <div className="space-y-6">
+          <form onSubmit={confirmEdit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Tên</label>
                 <input
                   type="text"
-                  defaultValue={selectedUser.name}
+                  value={editUser.name}
+                  onChange={(event) => setEditUser(current => ({ ...current, name: event.target.value }))}
                   className="w-full glass-effect-light rounded-xl px-4 py-3 text-white"
                 />
               </div>
@@ -336,17 +354,18 @@ export default function UserTable() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">Email</label>
                 <input
                   type="email"
-                  defaultValue={selectedUser.email}
+                  value={editUser.email}
+                  onChange={(event) => setEditUser(current => ({ ...current, email: event.target.value }))}
                   className="w-full glass-effect-light rounded-xl px-4 py-3 text-white"
                 />
               </div>
               
               <div>
                 <label className="block text-sm font-medium text-gray-300 mb-2">Vai trò</label>
-                <select className="w-full glass-effect-light rounded-xl px-4 py-3 text-white">
-                  <option value="user" selected={selectedUser.role === 'user'}>User</option>
-                  <option value="moderator" selected={selectedUser.role === 'moderator'}>Moderator</option>
-                  <option value="admin" selected={selectedUser.role === 'admin'}>Admin</option>
+                <select value={editUser.role} onChange={(event) => setEditUser(current => ({ ...current, role: event.target.value as User['role'] }))} className="w-full glass-effect-light rounded-xl px-4 py-3 text-white">
+                  <option className="bg-dark-surface" value="user">User</option>
+                  <option className="bg-dark-surface" value="moderator">Moderator</option>
+                  <option className="bg-dark-surface" value="admin">Admin</option>
                 </select>
               </div>
               
@@ -354,9 +373,18 @@ export default function UserTable() {
                 <label className="block text-sm font-medium text-gray-300 mb-2">Phòng ban</label>
                 <input
                   type="text"
-                  defaultValue={selectedUser.department}
+                  value={editUser.department}
+                  onChange={(event) => setEditUser(current => ({ ...current, department: event.target.value }))}
                   className="w-full glass-effect-light rounded-xl px-4 py-3 text-white"
                 />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-300 mb-2">Trạng thái</label>
+                <select value={editUser.status} onChange={(event) => setEditUser(current => ({ ...current, status: event.target.value as User['status'] }))} className="w-full glass-effect-light rounded-xl px-4 py-3 text-white">
+                  <option className="bg-dark-surface" value="active">Active</option>
+                  <option className="bg-dark-surface" value="inactive">Inactive</option>
+                  <option className="bg-dark-surface" value="pending">Pending</option>
+                </select>
               </div>
             </div>
             
@@ -364,11 +392,11 @@ export default function UserTable() {
               <Button variant="ghost" onClick={() => setShowEditModal(false)}>
                 Hủy
               </Button>
-              <Button variant="primary">
+              <Button type="submit" variant="primary">
                 Lưu thay đổi
               </Button>
             </div>
-          </div>
+          </form>
         )}
       </Modal>
 
