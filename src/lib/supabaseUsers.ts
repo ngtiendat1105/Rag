@@ -46,6 +46,9 @@ async function request(path: string, init: RequestInit = {}) {
     if (message.includes('create_app_user') && message.includes('schema cache')) {
       throw new Error('Supabase chưa có hàm create_app_user. Hãy chạy file supabase/migrations/20261022_create_app_user.sql trong SQL Editor.')
     }
+    if (message.includes('reset_app_user_password') && message.includes('schema cache')) {
+      throw new Error('Supabase chưa có hàm đặt lại mật khẩu. Hãy chạy file supabase/migrations/20261022_reset_password.sql trong SQL Editor.')
+    }
     throw new Error(message)
   }
   if (response.status === 204) return null
@@ -100,5 +103,13 @@ export async function updateUser(id: string, input: Partial<Pick<AppUser, 'name'
 
 export async function deleteUser(id: string) {
   await request(`/app_users?id=eq.${encodeURIComponent(id)}`, { method: 'DELETE' })
+}
+
+export async function resetUserPassword(email: string, password: string) {
+  const updated = await request('/rpc/reset_app_user_password', {
+    method: 'POST',
+    body: JSON.stringify({ p_email: email, p_password: password }),
+  }) as boolean
+  if (!updated) throw new Error('Không thể đặt lại mật khẩu cho tài khoản này.')
 }
 

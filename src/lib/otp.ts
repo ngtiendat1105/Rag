@@ -1,11 +1,12 @@
 import { createHash, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 
-type Challenge = { email: string; hash: Buffer; expires: number; attempts: number }
+export type OtpPurpose = 'login' | 'password-reset'
+type Challenge = { email: string; purpose: OtpPurpose; hash: Buffer; expires: number; attempts: number }
 const state = globalThis as typeof globalThis & { legalOtp?: { challenges: Map<string, Challenge>; sends: Map<string, number> } }
 const storage = state.legalOtp ??= { challenges: new Map(), sends: new Map() }
 const digest = (id: string, code: string) => createHash('sha256').update(`${id}:${code}`).digest()
 
-export async function sendOtp(email: string) {
+export async function sendOtp(email: string, purpose: OtpPurpose = 'login') {
   const key = process.env.RESEND_API_KEY
   const from = process.env.RESEND_FROM_EMAIL
   if (!key || !from) throw new Error('Chưa cấu hình RESEND_API_KEY và RESEND_FROM_EMAIL trên máy chủ.')
@@ -20,7 +21,14 @@ export async function sendOtp(email: string) {
     const response = await fetch('https://api.resend.com/emails', {
       method: 'POST',
       headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json', 'Idempotency-Key': id },
-      body: JSON.stringify({ from, to: [email], subject: 'Mã xác thực Legal AI', text: `Mã xác thực của bạn là: ${code}. Mã có hiệu lực trong 5 phút. Không chia sẻ mã này với bất kỳ ai.` }),
+      body: JSON.stringify({
+        from,
+        to: [email],
+        subject: purpose === 'password-reset' ? 'Đặt lại mật khẩu Legal AI' : 'Mã xác thực Legal AI',
+        text: purpose === 'password-reset'
+          ? `Mã đặt lại mật khẩu của bạn là: ${code}. Mã có hiệu lực trong 5 phút. Không chia sẻ mã này với bất kỳ ai.`
+          : `Mã xác thực của bạn là: ${code}. Mã có hiệu lực trong 5 phút. Không chia sẻ mã này với bất kỳ ai.`,
+      }),
       signal: AbortSignal.timeout(15000),
     })
     if (!response.ok) {
@@ -44,7 +52,7 @@ export async function sendOtp(email: string) {
     if (!result.id) throw new Error('Resend chưa xác nhận gửi email. Vui lòng thử lại.')
     // A successful resend invalidates all previous codes for this address.
     storage.challenges.forEach((value, oldId) => { if (value.email === email) storage.challenges.delete(oldId) })
-    storage.challenges.set(id, { email, hash: digest(id, code), expires: Date.now() + 300000, attempts: 0 })
+    storage.challenges.set(id, { email, purpose, hash: digest(id, code), expires: Date.now() + 300000, attempts: 0 })
     return id
   } catch (error) {
     storage.sends.delete(email)
@@ -52,9 +60,9 @@ export async function sendOtp(email: string) {
   }
 }
 
-export function verifyOtp(id: string, email: string, code: string) {
+export function verifyOtp(id: string, email: string, code: string, purpose: OtpPurpose = 'login') {
   const challenge = storage.challenges.get(id)
-  if (!challenge || challenge.email !== email || challenge.expires <= Date.now() || challenge.attempts >= 5) {
+  if (!challenge || challenge.email !== email || challenge.purpose !== purpose || challenge.expires <= Date.now() || challenge.attempts >= 5) {
     throw new Error('Mã OTP đã hết hạn hoặc không còn hợp lệ. Vui lòng gửi lại mã.')
   }
   challenge.attempts++

@@ -159,7 +159,7 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         <button
           type="button"
           className="text-sm text-accent-400 hover:text-accent-300 transition-colors"
-          onClick={() => console.log('Forgot password')}
+          onClick={() => router.push('/forgot-password')}
         >
           Quên mật khẩu?
         </button>

@@ -43,10 +43,15 @@ async function test() {
   id = await sendOtp(email)
   now += 300001
   assert.throws(() => verifyOtp(id, email, deliveredCode), /hết hạn/)
+  now += 60001
+  id = await sendOtp(email, 'password-reset')
+  assert.throws(() => verifyOtp(id, email, deliveredCode), /không còn hợp lệ/)
+  verifyOtp(id, email, deliveredCode, 'password-reset')
+  now += 60001
   failSend = true
   await assert.rejects(sendOtp(email), /Không thể gửi/)
   failSend = false
   await sendOtp(email)
-  console.log('PASS: delivery, cooldown, email binding, wrong code, one-time use, resend, attempt limit, expiry, delivery failure/retry')
+  console.log('PASS: delivery, cooldown, email/purpose binding, wrong code, one-time use, resend, attempt limit, expiry, delivery failure/retry')
 }
 test().catch(error => { console.error(error); process.exitCode = 1 })

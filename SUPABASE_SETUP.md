@@ -3,6 +3,7 @@
 1. Create a Supabase project.
 2. Open **SQL Editor**, paste and run `supabase/schema.sql`.
    - If the project previously ran an older schema and reports that `create_app_user` is missing from the schema cache, run `supabase/migrations/20261022_create_app_user.sql` once.
+   - To enable password recovery on an existing project, run `supabase/migrations/20261022_reset_password.sql` once.
 3. Copy `.env.example` values into `.env.local`:
    - `SUPABASE_URL`: Project Settings → API → Project URL.
    - `SUPABASE_SERVICE_ROLE_KEY`: Project Settings → API Keys → service role. Keep this server-only.
