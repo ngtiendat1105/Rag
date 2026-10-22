@@ -2,13 +2,14 @@ import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { UserRole } from '@/utils/constants'
 
-interface User {
+export interface User {
   id: string
   email: string
   name: string
   role: UserRole
   department: string
   avatar?: string
+  phone?: string | null
 }
 
 interface AuthState {
@@ -67,7 +68,7 @@ export const useAuthStore = create<AuthState>()(
       },
 
       completeLogin: (user: User) => {
-        set({ user: { ...user, avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}` }, token: 'http-only-session', isAuthenticated: true, isLoading: false })
+        set({ user: { ...user, avatar: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}` }, token: 'http-only-session', isAuthenticated: true, isLoading: false })
       },
     }),
     {

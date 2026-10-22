@@ -6,6 +6,8 @@ create table if not exists public.app_users (
   email text not null unique check (email = lower(email)),
   role text not null default 'user' check (role in ('admin', 'moderator', 'user')),
   department text not null default 'Chưa phân loại',
+  phone text,
+  avatar_url text,
   status text not null default 'active' check (status in ('active', 'inactive', 'pending')),
   password_hash text not null,
   last_active timestamptz,
@@ -91,4 +93,3 @@ notify pgrst, 'reload schema';
 -- Sau khi chạy schema, tạo admin đầu tiên trong SQL Editor bằng lệnh dưới đây.
 -- Hãy thay YOUR_EMAIL và YOUR_STRONG_PASSWORD; không commit mật khẩu thật vào Git.
 -- select * from public.create_app_user('Quản trị viên', 'YOUR_EMAIL', 'admin', 'IT Department', 'YOUR_STRONG_PASSWORD');
-

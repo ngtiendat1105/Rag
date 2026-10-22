@@ -141,10 +141,10 @@ export default function ChatPage() {
             <div className="flex items-center gap-4">
               {/* User info */}
               <div className="hidden md:flex items-center gap-3">
-                <div className="text-right">
+                <button onClick={() => router.push('/profile')} className="text-right hover:opacity-80" title="Xem hồ sơ">
                   <p className="font-medium">{user.name}</p>
                   <p className="text-xs text-gray-400">{user.department}</p>
-                </div>
+                </button>
                 <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-r from-accent-500 to-neon-cyan">
                   {user.avatar ? (
                     <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
@@ -154,6 +154,9 @@ export default function ChatPage() {
                     </div>
                   )}
                 </div>
+                <button onClick={() => router.push('/profile')} className="p-2 rounded-lg hover:bg-dark-surface" title="Xem và sửa hồ sơ">
+                  <User className="w-5 h-5" />
+                </button>
               </div>
 
               {/* Action buttons */}

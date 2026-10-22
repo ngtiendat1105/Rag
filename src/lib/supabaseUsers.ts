@@ -7,6 +7,8 @@ export interface AppUser {
   email: string
   role: AppUserRole
   department: string
+  phone: string | null
+  avatarUrl: string | null
   status: AppUserStatus
   lastActive: string | null
 }
@@ -17,6 +19,8 @@ interface SupabaseUserRow {
   email: string
   role: AppUserRole
   department: string
+  phone: string | null
+  avatar_url: string | null
   status: AppUserStatus
   last_active: string | null
 }
@@ -61,6 +65,8 @@ const mapUser = (row: SupabaseUserRow): AppUser => ({
   email: row.email,
   role: row.role,
   department: row.department,
+  phone: row.phone,
+  avatarUrl: row.avatar_url,
   status: row.status,
   lastActive: row.last_active,
 })
@@ -74,7 +80,7 @@ export async function authenticateUser(email: string, password: string): Promise
 }
 
 export async function findUserByEmail(email: string): Promise<AppUser | null> {
-  const rows = await request(`/app_users?select=id,name,email,role,department,status,last_active&email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`) as SupabaseUserRow[]
+  const rows = await request(`/app_users?select=id,name,email,role,department,phone,avatar_url,status,last_active&email=eq.${encodeURIComponent(email.toLowerCase())}&limit=1`) as SupabaseUserRow[]
   return rows[0] ? mapUser(rows[0]) : null
 }
 
@@ -92,10 +98,32 @@ export async function createUser(input: Pick<AppUser, 'name' | 'email' | 'role' 
 }
 
 export async function updateUser(id: string, input: Partial<Pick<AppUser, 'name' | 'email' | 'role' | 'department' | 'status'>>): Promise<AppUser> {
-  const rows = await request(`/app_users?id=eq.${encodeURIComponent(id)}&select=id,name,email,role,department,status,last_active`, {
+  const rows = await request(`/app_users?id=eq.${encodeURIComponent(id)}&select=id,name,email,role,department,phone,avatar_url,status,last_active`, {
     method: 'PATCH',
     headers: { Prefer: 'return=representation' },
     body: JSON.stringify(input.email ? { ...input, email: input.email.toLowerCase() } : input),
+  }) as SupabaseUserRow[]
+  if (!rows[0]) throw new Error('Không tìm thấy người dùng.')
+  return mapUser(rows[0])
+}
+
+export async function getUserById(id: string): Promise<AppUser | null> {
+  const rows = await request(`/app_users?select=id,name,email,role,department,phone,avatar_url,status,last_active&id=eq.${encodeURIComponent(id)}&limit=1`) as SupabaseUserRow[]
+  return rows[0] ? mapUser(rows[0]) : null
+}
+
+export async function updateProfile(
+  id: string,
+  input: Pick<AppUser, 'name' | 'phone' | 'avatarUrl'>
+): Promise<AppUser> {
+  const rows = await request(`/app_users?id=eq.${encodeURIComponent(id)}&select=id,name,email,role,department,phone,avatar_url,status,last_active`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=representation' },
+    body: JSON.stringify({
+      name: input.name.trim(),
+      phone: input.phone?.trim() || null,
+      avatar_url: input.avatarUrl || null,
+    }),
   }) as SupabaseUserRow[]
   if (!rows[0]) throw new Error('Không tìm thấy người dùng.')
   return mapUser(rows[0])
@@ -112,4 +140,3 @@ export async function resetUserPassword(email: string, password: string) {
   }) as boolean
   if (!updated) throw new Error('Không thể đặt lại mật khẩu cho tài khoản này.')
 }
-

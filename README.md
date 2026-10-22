@@ -381,6 +381,19 @@ python main_chat.py --provider ollama --model llama3.1:latest
 
 ### Chạy API
 
+### Hồ sơ người dùng trên website
+
+Người dùng đã đăng nhập có thể mở `/profile` từ header của trang chat để:
+
+- Xem họ tên và email.
+- Cập nhật họ tên.
+- Thêm hoặc sửa số điện thoại cá nhân.
+- Đổi ảnh đại diện PNG/JPEG/WebP, tối đa 1 MB.
+
+Trước khi dùng tính năng này, chạy migration
+[`supabase/migrations/20261022_add_profile_fields.sql`](./supabase/migrations/20261022_add_profile_fields.sql)
+trong Supabase SQL Editor để thêm `phone` và `avatar_url` vào bảng `app_users`.
+
 Thiết lập API key:
 
 ```powershell
