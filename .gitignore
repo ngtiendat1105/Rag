@@ -1,0 +1,19 @@
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+venv/
+env/
+.env
+.env.*
+
+# Generated runtime data
+chat_history.json
+processed_output/
+vector_db/
+test_path/
+
+# Local tooling and editor files
+.vscode/
+.idea/
+*.log

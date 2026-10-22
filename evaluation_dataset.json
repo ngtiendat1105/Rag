@@ -1,0 +1,38 @@
+[
+  {
+    "question": "Hợp đồng lao động phải có những nội dung chủ yếu nào?",
+    "expected_doc_id": "45/2019/QH14",
+    "expected_article": "21",
+    "expected_citation": {
+      "document": "Bộ luật Lao động 2019",
+      "article": "21"
+    }
+  },
+  {
+    "question": "Hợp đồng lao động có thể giao kết bằng lời nói trong trường hợp nào?",
+    "expected_doc_id": "45/2019/QH14",
+    "expected_article": "14",
+    "expected_citation": {
+      "document": "Bộ luật Lao động 2019",
+      "article": "14"
+    }
+  },
+  {
+    "question": "Thời hạn của hợp đồng lao động xác định thời hạn tối đa bao lâu?",
+    "expected_doc_id": "45/2019/QH14",
+    "expected_article": "20",
+    "expected_citation": {
+      "document": "Bộ luật Lao động 2019",
+      "article": "20"
+    }
+  },
+  {
+    "question": "Người sử dụng lao động có được giữ bản chính giấy tờ của người lao động không?",
+    "expected_doc_id": "45/2019/QH14",
+    "expected_article": "17",
+    "expected_citation": {
+      "document": "Bộ luật Lao động 2019",
+      "article": "17"
+    }
+  }
+]
