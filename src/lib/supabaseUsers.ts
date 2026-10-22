@@ -42,7 +42,11 @@ async function request(path: string, init: RequestInit = {}) {
   })
   if (!response.ok) {
     const error = await response.json().catch(() => ({}))
-    throw new Error(typeof error.message === 'string' ? error.message : `Supabase HTTP ${response.status}`)
+    const message = typeof error.message === 'string' ? error.message : `Supabase HTTP ${response.status}`
+    if (message.includes('create_app_user') && message.includes('schema cache')) {
+      throw new Error('Supabase chưa có hàm create_app_user. Hãy chạy file supabase/migrations/20261022_create_app_user.sql trong SQL Editor.')
+    }
+    throw new Error(message)
   }
   if (response.status === 204) return null
   return response.json()

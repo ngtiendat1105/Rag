@@ -58,6 +58,9 @@ $$;
 revoke all on function public.create_app_user(text, text, text, text, text) from public, anon, authenticated;
 grant execute on function public.create_app_user(text, text, text, text, text) to service_role;
 
+-- Yêu cầu PostgREST cập nhật danh sách RPC ngay sau khi tạo hàm.
+notify pgrst, 'reload schema';
+
 -- Sau khi chạy schema, tạo admin đầu tiên trong SQL Editor bằng lệnh dưới đây.
 -- Hãy thay YOUR_EMAIL và YOUR_STRONG_PASSWORD; không commit mật khẩu thật vào Git.
 -- select * from public.create_app_user('Quản trị viên', 'YOUR_EMAIL', 'admin', 'IT Department', 'YOUR_STRONG_PASSWORD');
