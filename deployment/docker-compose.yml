@@ -1,0 +1,53 @@
+services:
+  ollama:
+    image: ollama/ollama:0.40.8
+    restart: unless-stopped
+    volumes:
+      - ollama_data:/root/.ollama
+
+  rag-api:
+    build:
+      context: ..
+      dockerfile: backend/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - ollama
+    env_file:
+      - .env
+    environment:
+      OLLAMA_BASE_URL: http://ollama:11434
+    volumes:
+      - ../backend/data_documents:/app/data_documents:ro
+      - rag_processed:/app/processed_output
+      - rag_vectors:/app/vector_db
+      - huggingface_cache:/root/.cache/huggingface
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://127.0.0.1:8000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10m
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - rag-api
+    environment:
+      RAG_DOMAIN: ${RAG_DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  ollama_data:
+  rag_processed:
+  rag_vectors:
+  huggingface_cache:
+  caddy_data:
+  caddy_config:

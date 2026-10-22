@@ -113,6 +113,34 @@ body {
   @apply text-accent-400 hover:text-accent-300 underline;
 }
 
+/* Professional chat workspace */
+.chat-professional .markdown-content {
+  color: #334155;
+  font-size: 0.9375rem;
+  line-height: 1.75;
+}
+
+.chat-professional .markdown-content h1,
+.chat-professional .markdown-content h2,
+.chat-professional .markdown-content h3 {
+  color: #173f73;
+}
+
+.chat-professional .markdown-content code,
+.chat-professional .markdown-content pre {
+  background: #f1f5f9;
+  color: #173f73;
+}
+
+.chat-professional .markdown-content blockquote {
+  border-color: #b28647;
+  color: #475569;
+}
+
+.chat-professional .markdown-content a {
+  color: #173f73;
+}
+
 /* Text selection */
 ::selection {
   @apply bg-primary-500/30 text-white;

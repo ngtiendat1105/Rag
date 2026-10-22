@@ -6,11 +6,14 @@ venv/
 env/
 .env
 .env.*
+!deployment/.env.example
 
 # Generated runtime data
 chat_history.json
 processed_output/
 vector_db/
+backend/processed_output/
+backend/vector_db/
 test_path/
 
 # Local tooling and editor files

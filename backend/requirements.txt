@@ -18,3 +18,4 @@ pypdf
 Pillow
 pytesseract
 PyMuPDF
+python-dotenv

@@ -155,7 +155,7 @@ Response Quality: Excellent
 - **Status**: Ready
 - **Source Documents**: 5 markdown files (HR laws)
 - **Processed Chunks**: 51 JSON-formatted chunks
-- **File**: `processed_output/processed_knowledge_base.jsonl`
+- **File**: `backend/processed_output/processed_knowledge_base.jsonl`
 - **Validation**: All chunks properly structured with metadata
 
 ### 2. Embedder ✅
@@ -172,7 +172,7 @@ Response Quality: Excellent
 - **Collection**: `legal_knowledge_base`
 - **Documents Indexed**: 51 points
 - **Distance Metric**: Cosine Similarity
-- **Location**: `vector_db/qdrant_storage/`
+- **Location**: `backend/vector_db/qdrant_storage/`
 - **Lock Issues**: ✅ FIXED (clean single-client architecture)
 - **File**: `index_clean.py` (production indexing)
 
@@ -257,7 +257,7 @@ python test_rag_complete.py
 ### Interactive Testing
 ```bash
 # Interactive chat interface
-python main_chat.py --provider ollama --model "llama3.2:latest"
+python backend/main_chat.py --provider ollama --model "llama3.2:latest"
 
 # Try these questions:
 # - Lương tối thiểu là bao nhiêu?
@@ -344,7 +344,7 @@ Storage_Path = "vector_db/qdrant_storage"
 
 ### Immediate (Ready Now)
 1. ✅ Use `test_rag_complete.py` as reference implementation
-2. ✅ Deploy interactive interface: `python main_chat.py`
+2. ✅ Deploy interactive interface: `python backend/main_chat.py`
 3. ✅ Monitor Ollama performance with multiple users
 
 ### Short-term (1-2 weeks)
@@ -391,15 +391,15 @@ Storage_Path = "vector_db/qdrant_storage"
 ### Data
 | File | Purpose | Status |
 |------|---------|--------|
-| `processed_output/processed_knowledge_base.jsonl` | 51 indexed chunks | ✅ Ready |
-| `vector_db/qdrant_storage/` | Vector database | ✅ Ready |
+| `backend/processed_output/processed_knowledge_base.jsonl` | 51 indexed chunks | ✅ Ready |
+| `backend/vector_db/qdrant_storage/` | Vector database | ✅ Ready |
 
 ---
 
 ## Support & Documentation
 
 ### For End Users
-- Interactive testing: `python main_chat.py`
+- Interactive testing: `python backend/main_chat.py`
 - Sample questions in TESTING_COMPLETE.md (this file)
 - Response format includes source documents
 

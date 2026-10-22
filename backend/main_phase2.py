@@ -71,12 +71,6 @@ class Phase2Pipeline:
                 db_manager=self.db_manager
             )
             
-            # Tạo retriever
-            self.retriever = create_legal_retriever(
-                embedder=self.embedder,
-                db_manager=self.db_manager
-            )
-            
             print("✅ Components setup completed")
             
         except Exception as e:
@@ -247,6 +241,12 @@ class Phase2Pipeline:
             
             # Chạy indexing
             self.run_indexing(recreate_collection=recreate_collection)
+
+            # Retriever chỉ được khởi tạo sau khi collection đã được tạo và có dữ liệu.
+            self.retriever = create_legal_retriever(
+                embedder=self.embedder,
+                db_manager=self.db_manager
+            )
             
             # Test retrieval
             self.test_retrieval()

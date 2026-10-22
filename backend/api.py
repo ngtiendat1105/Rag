@@ -2,16 +2,20 @@ import os
 import secrets
 import threading
 import time
+from pathlib import Path
 from collections import defaultdict, deque
 from functools import lru_cache
+from typing import TYPE_CHECKING
 
 from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
+from dotenv import load_dotenv
 
-from config_llm import LLMProvider
-from rag_pipeline import RAGPipeline, create_rag_pipeline
-from retriever_service import RetrievalError
+load_dotenv(Path(__file__).resolve().parents[1] / '.env.local')
+
+if TYPE_CHECKING:
+    from rag_pipeline import RAGPipeline
 
 
 app = FastAPI(title="LegalAI RAG API", version="1.0.0")
@@ -42,10 +46,22 @@ class ChatResponse(BaseModel):
 
 
 @lru_cache(maxsize=1)
-def get_pipeline() -> RAGPipeline:
+def get_pipeline() -> "RAGPipeline":
+    from config_llm import LLMProvider
+    from rag_pipeline import create_rag_pipeline
+    provider_name = os.getenv("RAG_LLM_PROVIDER", "ollama").strip().lower()
+    providers = {
+        "ollama": LLMProvider.OLLAMA,
+        "openai": LLMProvider.OPENAI,
+        "google_gemini": LLMProvider.GOOGLE_GEMINI,
+        "gemini": LLMProvider.GOOGLE_GEMINI,
+    }
+    provider = providers.get(provider_name)
+    if provider is None:
+        raise ValueError(f"RAG_LLM_PROVIDER không hợp lệ: {provider_name}")
     return create_rag_pipeline(
-        provider=LLMProvider.OLLAMA,
-        model_name=os.getenv("OLLAMA_MODEL", "llama3.2:latest"),
+        provider=provider,
+        model_name=os.getenv("RAG_LLM_MODEL") or os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
     )
 
 
@@ -80,9 +96,21 @@ def chat(
     payload: ChatRequest,
     _: None = Depends(require_api_key),
 ):
+    from query_understanding import OFF_TOPIC_RESPONSE, is_supported_question
+
     enforce_rate_limit(request)
+    question = payload.question.strip()
+    if not is_supported_question(question):
+        return {
+            "question": question,
+            "answer": OFF_TOPIC_RESPONSE,
+            "sources": [],
+            "has_warning": False,
+            "num_sources": 0,
+        }
+    from retriever_service import RetrievalError
     try:
-        result = get_pipeline().query(payload.question.strip())
+        result = get_pipeline().query(question)
     except RetrievalError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
     except Exception as exc:

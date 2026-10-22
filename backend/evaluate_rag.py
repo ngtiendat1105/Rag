@@ -68,7 +68,8 @@ def evaluate_results(
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Evaluate RAG retrieval metrics")
-    parser.add_argument("--dataset", default="evaluation_dataset.json")
+    default_dataset = Path(__file__).parent / "evaluation" / "evaluation_dataset.json"
+    parser.add_argument("--dataset", default=str(default_dataset))
     parser.add_argument("--top-k", type=int, default=5)
     args = parser.parse_args()
 

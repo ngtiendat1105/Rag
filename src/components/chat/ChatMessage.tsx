@@ -66,19 +66,19 @@ export default function ChatMessage({
   const isError = status === 'error'
 
   const getMessageBg = () => {
-    if (isUser) return 'bg-gradient-to-r from-primary-600 to-primary-700'
-    if (isAI) return 'bg-dark-surface'
-    if (isSystem) return 'bg-accent-900/20'
-    if (isError) return 'bg-red-900/20'
-    return 'bg-dark-surface'
+    if (isUser) return 'bg-[#173f73] text-white shadow-sm'
+    if (isAI) return 'bg-white text-slate-700 shadow-sm'
+    if (isSystem) return 'bg-amber-50 text-slate-700'
+    if (isError) return 'bg-red-50 text-red-800'
+    return 'bg-white text-slate-700'
   }
 
   const getMessageBorder = () => {
-    if (isUser) return 'border-primary-500/30'
-    if (isAI) return 'border-dark-border'
-    if (isSystem) return 'border-accent-500/30'
-    if (isError) return 'border-red-500/30'
-    return 'border-dark-border'
+    if (isUser) return 'border-[#173f73]'
+    if (isAI) return 'border-slate-200'
+    if (isSystem) return 'border-amber-200'
+    if (isError) return 'border-red-200'
+    return 'border-slate-200'
   }
 
   const getIcon = () => {
@@ -96,10 +96,10 @@ export default function ChatMessage({
       className={`flex gap-3 ${isUser ? 'flex-row-reverse' : 'flex-row'}`}
     >
       {/* Avatar */}
-      <div className={`flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center
-        ${isUser ? 'bg-gradient-to-r from-primary-500 to-secondary-500' : 'bg-gradient-to-r from-accent-500 to-neon-cyan'}
-        ${isSystem && 'bg-gradient-to-r from-yellow-500 to-orange-500'}
-        ${isError && 'bg-gradient-to-r from-red-500 to-pink-500'}`}>
+      <div className={`flex-shrink-0 w-9 h-9 rounded-xl flex items-center justify-center shadow-sm
+        ${isUser ? 'bg-slate-200 text-slate-600' : 'bg-[#173f73] text-white'}
+        ${isSystem && 'bg-amber-100 text-amber-700'}
+        ${isError && 'bg-red-100 text-red-700'}`}>
         {getIcon()}
       </div>
 
@@ -109,7 +109,7 @@ export default function ChatMessage({
           <span className="font-semibold text-sm">
             {isUser ? 'Bạn' : isAI ? 'Legal AI Assistant' : 'Hệ thống'}
           </span>
-          <span className="text-xs text-gray-400 ml-2">
+          <span className="text-xs text-slate-400 ml-2">
             {formatDate(timestamp)}
             {status === 'sending' && ' • Đang gửi...'}
             {status === 'error' && ' • Lỗi'}

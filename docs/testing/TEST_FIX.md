@@ -53,7 +53,7 @@ Get-Process python -ErrorAction SilentlyContinue | Stop-Process -Force
 Start-Sleep -Seconds 3
 
 # Start chat
-python main_chat.py --provider ollama --model "llama3.2:latest"
+python backend/main_chat.py --provider ollama --model "llama3.2:latest"
 ```
 
 ### Test với câu hỏi:

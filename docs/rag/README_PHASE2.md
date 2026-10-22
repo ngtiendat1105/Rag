@@ -77,27 +77,27 @@ pip install tqdm  # Optional: for progress bars
 
 ### 1. Test các components
 ```bash
-python main_phase2.py --components
+python backend/main_phase2.py --components
 ```
 
 ### 2. Chạy toàn bộ pipeline (test mode với model nhỏ)
 ```bash
-python main_phase2.py --test
+python backend/main_phase2.py --test
 ```
 
 ### 3. Chạy pipeline đầy đủ
 ```bash
-python main_phase2.py
+python backend/main_phase2.py
 ```
 
 ### 4. Interactive search mode
 ```bash
-python main_phase2.py --interactive
+python backend/main_phase2.py --interactive
 ```
 
 ### 5. Test query cụ thể
 ```bash
-python main_phase2.py --query "lương cơ sở hiện tại là bao nhiêu?"
+python backend/main_phase2.py --query "lương cơ sở hiện tại là bao nhiêu?"
 ```
 
 ## 🎯 NGHIỆP VỤ XỬ LÝ THÔNG MINH

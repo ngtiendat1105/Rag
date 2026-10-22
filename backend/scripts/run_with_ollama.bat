@@ -1,4 +1,5 @@
 @echo off
+cd /d "%~dp0.."
 echo ========================================
 echo  RUN RAG SYSTEM WITH OLLAMA (Windows)
 echo ========================================
@@ -19,8 +20,8 @@ REM 2. Check if model exists
 echo [2] Checking Llama model...
 ollama list | findstr "llama3" >nul
 if errorlevel 1 (
-    echo ⚠️  Llama model not found. Pulling llama3.1:latest...
-    ollama pull llama3.1:latest
+    echo Llama model not found. Pulling llama3.2:3b...
+    ollama pull llama3.2:3b
 ) else (
     echo ✅ Llama model found
 )
@@ -46,6 +47,6 @@ echo ========================================
 echo  LEGAL RAG CHATBOT - OLLAMA MODE
 echo ========================================
 echo.
-python main_chat.py --provider ollama --model llama3.1:latest
+python main_chat.py --provider ollama --model llama3.2:3b
 
 pause

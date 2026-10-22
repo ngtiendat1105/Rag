@@ -20,13 +20,13 @@ Hệ thống có thể ingest:
 Đặt file upload vào thư mục `data_documents` ở thư mục dự án, sau đó chạy:
 
 ```powershell
-python sync_documents.py
+python backend/sync_documents.py
 ```
 
 Để tự động phát hiện file mới hoặc file được sửa:
 
 ```powershell
-python sync_documents.py --watch
+python backend/sync_documents.py --watch
 ```
 
 Watcher đợi file upload ghi xong, tạo lại knowledge base, embedding và Qdrant.
@@ -51,25 +51,25 @@ ollama pull llama3.1:latest
 ### Bước 3: Chạy vector database
 ```powershell
 cd "c:\Xây dựng Hệ thống Trợ lý ảo Nội bộ (Business Information System) ứng dụng kỹ thuật RAG  Luận án tốt nghiệp"
-python main_phase2.py
+python backend/main_phase2.py
 ```
 
 ### Bước 4: Chạy hệ thống RAG
 ```powershell
-python main_chat.py --provider ollama
+python backend/main_chat.py --provider ollama
 ```
 
 ## 📝 Các lệnh hữu ích
 
 ### Chạy với model cụ thể:
 ```bash
-python main_chat.py --provider ollama --model llama3.1:latest
-python main_chat.py --provider ollama --model mistral:latest
+python backend/main_chat.py --provider ollama --model llama3.1:latest
+python backend/main_chat.py --provider ollama --model mistral:latest
 ```
 
 ### Chạy test mode (không cần Ollama):
 ```bash
-python main_chat.py --test
+python backend/main_chat.py --test
 ```
 
 ### Test retrieval:
@@ -109,7 +109,7 @@ ollama pull llama3.1:latest
 ### Lỗi: Vector database empty
 ```bash
 # Chạy Phase 2
-python main_phase2.py
+python backend/main_phase2.py
 ```
 
 ### Lỗi: Qdrant locked
@@ -125,7 +125,7 @@ taskkill /f /im python.exe
 run_with_ollama.bat
 
 # Hoặc tạo alias trong PowerShell
-New-Alias -Name rag-ollama -Value "python main_chat.py --provider ollama"
+New-Alias -Name rag-ollama -Value "python backend/main_chat.py --provider ollama"
 ```
 
 ## 📞 Hỗ trợ
@@ -155,7 +155,7 @@ Nhập câu hỏi pháp lý (hoặc 'quit' để thoát):
 Bộ dữ liệu đánh giá nằm trong `evaluation_dataset.json`. Chạy:
 
 ```powershell
-python evaluate_rag.py --top-k 5
+python backend/evaluate_rag.py --top-k 5
 ```
 
 Kết quả gồm `recall_at_5`, `mrr` và `citation_accuracy`.

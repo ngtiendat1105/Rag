@@ -55,6 +55,23 @@ DOCUMENT_SOURCE_FILES = {
     "Quy chế Bảo mật thông tin": "09_Quy_che_bao_mat_thong_tin.md",
 }
 
+OFF_TOPIC_RESPONSE = (
+    "Xin lỗi. Tôi chỉ là 1 chatbot hỗ trợ tra cứu các vấn đề pháp lý nội bộ. "
+    "Các vấn đề không liên quan bạn có thể tìm hiểu ở các bộ phận khác."
+)
+
+SUPPORTED_TOPIC_TERMS = {
+    "phap luat", "phap ly", "luat", "bo luat", "nghi dinh", "thong tu",
+    "dieu", "khoan", "quy dinh", "quyen", "nghia vu", "hop dong",
+    "lao dong", "luong", "thuong", "phu cap", "bao hiem", "bhxh", "bhyt",
+    "bhtn", "nghi", "phep", "thu viec", "sa thai", "ky luat", "cong ty",
+    "doanh nghiep", "nhan vien", "tuyen dung", "viec lam", "noi quy",
+    "quy che", "chinh sach", "thu tuc", "khieu nai", "tranh chap",
+    "boi thuong", "thue", "dau tu", "canh tranh", "thuong mai", "giao dich",
+    "chu ky", "bao mat", "du lieu", "kpi", "phuc loi", "co dong", "von",
+    "hoa don", "che do", "thai san", "om dau", "tro cap", "huong",
+}
+
 
 def _normalize(text: str) -> str:
     return re.sub(r"\s+", " ", unicodedata.normalize("NFC", text or "").strip().lower())
@@ -66,6 +83,12 @@ def fold_text(text: str) -> str:
         char for char in decomposed
         if unicodedata.category(char) != "Mn"
     ).replace("đ", "d")
+
+
+def is_supported_question(question: str) -> bool:
+    """Return True when a question belongs to the legal/internal knowledge scope."""
+    folded = fold_text(_normalize(question))
+    return any(term in folded for term in SUPPORTED_TOPIC_TERMS)
 
 
 def understand_query(query: str) -> Dict[str, Any]:

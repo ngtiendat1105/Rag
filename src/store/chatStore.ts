@@ -2,6 +2,7 @@ import { create } from 'zustand'
 import { SAMPLE_CHATS, DEMO_MESSAGES } from '@/utils/constants'
 import { generateChatId } from '@/utils/formatters'
 import { ContentModerationError, moderateChatContent } from '@/utils/contentModeration'
+import { ragChatService } from '@/services/ragChatService'
 
 export interface ChatAttachment {
   id: string
@@ -124,52 +125,45 @@ export const useChatStore = create<ChatState>((set, get) => ({
       processingStage: attachments.length ? 'Đang đọc tài liệu đính kèm...' : 'Đang tìm tài liệu liên quan...',
     }))
 
-    await new Promise(resolve => setTimeout(resolve, 500))
-    set({ processingStage: 'Đang đánh giá độ phù hợp của nguồn...' })
-    await new Promise(resolve => setTimeout(resolve, 500))
-    set({ processingStage: 'Đang tổng hợp câu trả lời...' })
-    await new Promise(resolve => setTimeout(resolve, 500))
-
-    const aiResponse: Message = {
-      id: `msg_${Date.now()}_ai`,
-      role: 'assistant',
-      content: attachments.length > 0
-        ? `Tôi đã nhận ${attachments.length} tệp đính kèm (${attachments.map(file => file.name).join(', ')}).
-
-**Lưu ý:** Bản demo hiện lưu thông tin tệp trong cuộc trò chuyện nhưng chưa trích xuất nội dung tệp. Cần kết nối dịch vụ upload và xử lý tài liệu để tôi có thể tóm tắt hoặc kiểm tra điều khoản bên trong.`
-        : `Đây là phản hồi từ AI về câu hỏi "${content}". Tôi đã phân tích và tìm thấy các tài liệu liên quan.
-      
-**Thông tin pháp lý liên quan:**
-- Điều 15 Bộ luật Lao động
-- Nghị định 145/2020/NĐ-CP
-- Thông tư 10/2020/TT-BLĐTBXH
-
-**Gợi ý tiếp theo:** Bạn có muốn tôi tìm hiểu thêm về vấn đề cụ thể nào không?`,
-      timestamp: new Date().toISOString(),
-      references: attachments.length ? [] : [
-        { title: 'Bộ luật Lao động 2019', page: 12, excerpt: 'Điều 15 quy định về hợp đồng lao động và hình thức giao kết.' },
-        { title: 'Nghị định 145/2020/NĐ-CP', page: 8, excerpt: 'Quy định chi tiết và hướng dẫn thi hành một số điều của Bộ luật Lao động.' },
-      ],
-      confidence: attachments.length ? 35 : 88,
+    try {
+      set({ processingStage: 'Đang truy xuất và tổng hợp từ kho tài liệu...' })
+      const ragResponse = await ragChatService.sendQueryToRAG(content)
+      const aiResponse: Message = {
+        id: ragResponse.id,
+        role: 'assistant',
+        content: ragResponse.hasWarning
+          ? `> **Cần đối chiếu:** Một hoặc nhiều nguồn chưa được xác minh đầy đủ.\n\n${ragResponse.message}`
+          : ragResponse.message,
+        timestamp: ragResponse.timestamp,
+        references: ragResponse.references,
+        confidence: ragResponse.confidence,
+      }
+      set(state => ({
+        chats: state.chats.map(chat => chat.id === activeChatId ? {
+          ...chat,
+          messages: [...chat.messages.map(msg => msg.id === userMessage.id ? { ...msg, status: 'sent' as const } : msg), aiResponse],
+        } : chat),
+        isTyping: false,
+        processingStage: '',
+      }))
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Không thể xử lý câu hỏi.'
+      const errorResponse: Message = {
+        id: `msg_${Date.now()}_error`,
+        role: 'assistant',
+        content: message,
+        timestamp: new Date().toISOString(),
+        status: 'error',
+      }
+      set(state => ({
+        chats: state.chats.map(chat => chat.id === activeChatId ? {
+          ...chat,
+          messages: [...chat.messages.map(msg => msg.id === userMessage.id ? { ...msg, status: 'error' as const } : msg), errorResponse],
+        } : chat),
+        isTyping: false,
+        processingStage: '',
+      }))
     }
-
-    // Update chat with AI response
-    set(state => ({
-      chats: state.chats.map(chat =>
-        chat.id === activeChatId
-          ? {
-              ...chat,
-              messages: [...chat.messages.map(msg => 
-                msg.id === userMessage.id 
-                  ? { ...msg, status: 'sent' as const }
-                  : msg
-              ), aiResponse],
-            }
-          : chat
-      ),
-      isTyping: false,
-      processingStage: '',
-    }))
   },
 
   deleteChat: (chatId: string) => {

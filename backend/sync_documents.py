@@ -140,7 +140,7 @@ def main() -> None:
         raise RuntimeError("Một số file không xử lý được: " + "; ".join(errors))
     if not args.no_reindex:
         rebuild_index()
-    print(f"Đã đồng bộ {count} chunks.")
+    print(f"Synced {count} chunks.")
 
 
 if __name__ == "__main__":

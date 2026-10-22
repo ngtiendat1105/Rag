@@ -1,0 +1,14 @@
+.git
+.next
+node_modules
+.venv
+venv
+__pycache__
+*.pyc
+.env
+.env.*
+!.env.example
+backend/vector_db
+backend/processed_output
+backend/archive
+answer_work

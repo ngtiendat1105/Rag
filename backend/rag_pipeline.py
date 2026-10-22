@@ -12,6 +12,7 @@ from langchain_core.runnables import RunnableParallel, RunnablePassthrough, Runn
 
 from config_llm import LLMConfig, LLMProvider
 from prompts import LegalPrompts
+from query_understanding import OFF_TOPIC_RESPONSE, is_supported_question
 from retriever_service import (
     LegalRetrieverService as RetrieverService,
     RetrievalError,
@@ -19,8 +20,8 @@ from retriever_service import (
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "12000"))
-MAX_CONTEXT_DOCUMENTS = int(os.getenv("RAG_MAX_CONTEXT_DOCUMENTS", "4"))
+MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "8000"))
+MAX_CONTEXT_DOCUMENTS = int(os.getenv("RAG_MAX_CONTEXT_DOCUMENTS", "3"))
 LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "1"))
 
 
@@ -156,6 +157,15 @@ TRẢ LỜI:"""
         Returns:
             Dictionary với keys: answer, sources, has_warning
         """
+        if not is_supported_question(question):
+            return {
+                "question": question,
+                "answer": OFF_TOPIC_RESPONSE,
+                "sources": [],
+                "has_warning": False,
+                "num_sources": 0,
+            }
+
         try:
             logger.info(f"Đang xử lý câu hỏi: {question}")
             

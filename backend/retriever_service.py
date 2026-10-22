@@ -151,7 +151,7 @@ class LegalRetrieverService:
             
             # Tạo LangChain embeddings adapter
             # Note: Chúng ta cần adapter để sử dụng embedder của chúng ta với LangChain
-            from langchain.embeddings.base import Embeddings
+            from langchain_core.embeddings import Embeddings
             
             class CustomEmbeddings(Embeddings):
                 """Adapter để sử dụng VietnameseEmbedder với LangChain"""

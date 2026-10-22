@@ -1,250 +1,48 @@
 'use client'
 
-import { useState, useRef, KeyboardEvent } from 'react'
-import { motion } from 'framer-motion'
-import { 
-  Send, 
-  Paperclip, 
-  Mic, 
-  Image, 
-  X,
-  FileText,
-  Search,
-  Smile
-} from 'lucide-react'
-import Button from '@/components/ui/Button'
+import { KeyboardEvent, useRef, useState } from 'react'
+import { ArrowUp, FileText, Paperclip, ShieldCheck, X } from 'lucide-react'
 import type { ChatAttachment } from '@/store/chatStore'
 
-interface ChatInputProps {
-  onSendMessage: (message: string, attachments?: ChatAttachment[]) => void | Promise<void>
-  placeholder?: string
-  disabled?: boolean
-  isLoading?: boolean
-  allowAttachments?: boolean
-  onAttachmentClick?: () => void
-}
+interface Props { onSendMessage: (message: string, attachments?: ChatAttachment[]) => void | Promise<void>; placeholder?: string; disabled?: boolean; isLoading?: boolean; allowAttachments?: boolean; onAttachmentClick?: () => void }
 
-export default function ChatInput({
-  onSendMessage,
-  placeholder = 'Nhập câu hỏi về pháp lý...',
-  disabled = false,
-  isLoading = false,
-  allowAttachments = true,
-  onAttachmentClick,
-}: ChatInputProps) {
+export default function ChatInput({ onSendMessage, placeholder = 'Nhập câu hỏi về pháp lý...', disabled = false, isLoading = false, allowAttachments = true, onAttachmentClick }: Props) {
   const [message, setMessage] = useState('')
-  const [isFocused, setIsFocused] = useState(false)
-  const [moderationError, setModerationError] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [error, setError] = useState('')
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
-  const [attachmentError, setAttachmentError] = useState('')
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const suggestions = ['Quy định nghỉ phép năm', 'Thời gian thử việc tối đa', 'Chế độ bảo hiểm xã hội']
 
-  const handleSubmit = async () => {
-    const trimmedMessage = message.trim()
-    if (!trimmedMessage || disabled || isLoading || isSubmitting) return
-
-    setModerationError('')
-    setIsSubmitting(true)
-    try {
-      await onSendMessage(trimmedMessage, attachments)
-      setMessage('')
-      setAttachments([])
-      if (textareaRef.current) textareaRef.current.style.height = 'auto'
-    } catch (error) {
-      setModerationError(error instanceof Error ? error.message : 'Không thể gửi tin nhắn. Vui lòng thử lại.')
-      textareaRef.current?.focus()
-    } finally {
-      setIsSubmitting(false)
-    }
+  const submit = async () => {
+    const value = message.trim()
+    if (!value || disabled || isLoading || isSubmitting) return
+    setError(''); setIsSubmitting(true)
+    try { await onSendMessage(value, attachments); setMessage(''); setAttachments([]); if (textareaRef.current) textareaRef.current.style.height = 'auto' }
+    catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể gửi câu hỏi. Vui lòng thử lại.'); textareaRef.current?.focus() }
+    finally { setIsSubmitting(false) }
   }
-
-  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSubmit()
-    }
-  }
-
-  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    setMessage(e.target.value)
-    if (moderationError) setModerationError('')
-    
-    // Auto-resize textarea
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto'
-      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`
-    }
-  }
-
-  const handleAttachmentClick = () => {
-    if (onAttachmentClick) {
-      onAttachmentClick()
-    } else {
-      fileInputRef.current?.click()
-    }
-  }
-
+  const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => { if (event.key === 'Enter' && !event.shiftKey) { event.preventDefault(); submit() } }
   const handleFiles = (files: FileList | null) => {
     if (!files) return
     const allowed = ['application/pdf', 'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain']
     const selected = Array.from(files)
-    const invalid = selected.find(file => !allowed.includes(file.type) || file.size > 10 * 1024 * 1024)
-    if (invalid) {
-      setAttachmentError('Chỉ hỗ trợ PDF, Word, TXT tối đa 10 MB mỗi tệp.')
-      return
-    }
-    setAttachmentError('')
-    setAttachments(current => [...current, ...selected.map(file => ({ id: `${file.name}-${file.lastModified}-${file.size}`, name: file.name, size: file.size, type: file.type }))].slice(0, 5))
-    if (fileInputRef.current) fileInputRef.current.value = ''
+    if (selected.some(file => !allowed.includes(file.type) || file.size > 10 * 1024 * 1024)) { setError('Chỉ hỗ trợ PDF, Word, TXT tối đa 10 MB mỗi tệp.'); return }
+    setError(''); setAttachments(current => [...current, ...selected.map(file => ({ id: `${file.name}-${file.lastModified}-${file.size}`, name: file.name, size: file.size, type: file.type }))].slice(0, 5))
   }
 
-  const quickQuestions = [
-    'Quy định nghỉ phép năm?',
-    'Hợp đồng lao động mẫu?',
-    'Cách tính bảo hiểm xã hội?',
-    'Chính sách tăng lương?',
-  ]
-
-  return (
-    <div className="space-y-4">
-      {/* Quick questions */}
-      <div className="flex flex-wrap gap-2">
-        {quickQuestions.map((question, index) => (
-          <motion.button
-            key={index}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setMessage(question)}
-            className="px-3 py-1.5 glass-effect-light rounded-full text-sm hover:bg-dark-surface transition-colors"
-          >
-            {question}
-          </motion.button>
-        ))}
-      </div>
-
-      {/* Input area */}
-      <div className={`relative glass-effect rounded-2xl border transition-all duration-300
-        ${isFocused ? 'border-primary-500/50 ring-2 ring-primary-500/20' : 'border-dark-border'}`}>
-        
-        {/* Top bar */}
-        <div className="flex items-center justify-between p-3 border-b border-dark-border">
-          <div className="flex items-center gap-2">
-            <button
-              onClick={handleAttachmentClick}
-              disabled={disabled || !allowAttachments}
-              className="p-2 rounded-lg hover:bg-dark-surface transition-colors disabled:opacity-50"
-              title="Đính kèm tài liệu"
-            >
-              <Paperclip className="w-5 h-5 text-gray-400" />
-            </button>
-            <input ref={fileInputRef} type="file" multiple accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={event => handleFiles(event.target.files)} />
-            
-            <button
-              className="p-2 rounded-lg hover:bg-dark-surface transition-colors disabled:opacity-50"
-              title="Tìm kiếm trong tài liệu"
-            >
-              <Search className="w-5 h-5 text-gray-400" />
-            </button>
-            
-            <button
-              className="p-2 rounded-lg hover:bg-dark-surface transition-colors disabled:opacity-50"
-              title="Chèn biểu tượng cảm xúc"
-            >
-              <Smile className="w-5 h-5 text-gray-400" />
-            </button>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-gray-400">
-              {message.length}/2000
-            </span>
-          </div>
-        </div>
-
-        {/* Textarea */}
-        <div className="p-4">
-          <textarea
-            ref={textareaRef}
-            value={message}
-            onChange={handleTextareaChange}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setIsFocused(true)}
-            onBlur={() => setIsFocused(false)}
-            placeholder={placeholder}
-            disabled={disabled || isLoading || isSubmitting}
-            rows={1}
-            className="w-full bg-transparent text-white placeholder-gray-400 resize-none
-                     focus:outline-none disabled:opacity-50 min-h-[24px] max-h-[120px]"
-          />
-        </div>
-
-        {(attachments.length > 0 || attachmentError) && (
-          <div className="border-b border-dark-border px-3 py-3">
-            {attachmentError && <p role="alert" className="mb-2 text-sm text-red-300">{attachmentError}</p>}
-            <div className="flex flex-wrap gap-2">{attachments.map(file => (
-              <span key={file.id} className="flex max-w-full items-center gap-2 rounded-lg bg-primary-500/10 px-3 py-2 text-xs text-primary-200">
-                <FileText className="h-3.5 w-3.5 shrink-0" /><span className="max-w-48 truncate">{file.name}</span><span className="text-gray-400">{(file.size / 1024 / 1024).toFixed(1)} MB</span>
-                <button type="button" aria-label={`Bỏ tệp ${file.name}`} onClick={() => setAttachments(current => current.filter(item => item.id !== file.id))}><X className="h-3.5 w-3.5" /></button>
-              </span>
-            ))}</div>
-          </div>
-        )}
-
-        {moderationError && (
-          <div role="alert" className="mx-3 mb-3 rounded-xl border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
-            {moderationError}
-          </div>
-        )}
-
-        {/* Bottom bar */}
-        <div className="flex items-center justify-between p-3 border-t border-dark-border">
-          <div className="flex items-center gap-2 text-sm text-gray-400">
-            <button className="flex items-center gap-1 hover:text-white transition-colors">
-              <Mic className="w-4 h-4" />
-              <span>Voice input</span>
-            </button>
-            
-            <div className="w-px h-4 bg-dark-border" />
-            
-            <button className="flex items-center gap-1 hover:text-white transition-colors">
-              <Image className="w-4 h-4" />
-              <span>Hình ảnh</span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {message && (
-              <button
-                onClick={() => setMessage('')}
-                className="p-2 rounded-lg hover:bg-dark-surface transition-colors"
-              >
-                <X className="w-5 h-5 text-gray-400" />
-              </button>
-            )}
-            
-            <Button
-              onClick={handleSubmit}
-              variant="primary"
-              size="sm"
-              loading={isLoading || isSubmitting}
-              disabled={!message.trim() || disabled || isSubmitting}
-              icon={<Send className="w-4 h-4" />}
-            >
-              Gửi
-            </Button>
-          </div>
-        </div>
-      </div>
-
-      {/* Help text */}
-      <div className="flex items-center gap-2 text-xs text-gray-400">
-        <FileText className="w-3 h-3" />
-        <span>
-          Hãy sử dụng ngôn ngữ lịch sự. Nhấn <kbd className="px-1.5 py-0.5 glass-effect rounded text-xs">Enter</kbd> để gửi
-        </span>
+  return <div>
+    <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{suggestions.map(item => <button key={item} onClick={() => { setMessage(item); textareaRef.current?.focus() }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-[#173f73]/30 hover:bg-[#f3f7fb] hover:text-[#173f73]">{item}</button>)}</div>
+    <div className="rounded-2xl border border-slate-300 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition focus-within:border-[#173f73]/50 focus-within:ring-4 focus-within:ring-[#173f73]/5">
+      {attachments.length > 0 && <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3">{attachments.map(file => <span key={file.id} className="flex max-w-full items-center gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-600"><FileText className="h-3.5 w-3.5" /><span className="max-w-40 truncate">{file.name}</span><button onClick={() => setAttachments(current => current.filter(item => item.id !== file.id))} aria-label={`Bỏ tệp ${file.name}`}><X className="h-3.5 w-3.5" /></button></span>)}</div>}
+      <textarea ref={textareaRef} value={message} maxLength={2000} rows={1} disabled={disabled || isLoading || isSubmitting} placeholder={placeholder} onKeyDown={handleKeyDown} onChange={event => { setMessage(event.target.value); setError(''); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 140)}px` }} className="min-h-[64px] max-h-[140px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-[15px] leading-6 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50" />
+      {error && <p role="alert" className="mx-4 mb-2 text-sm text-red-600">{error}</p>}
+      <div className="flex items-center justify-between px-3 pb-3">
+        <div className="flex items-center gap-2"><button onClick={() => onAttachmentClick ? onAttachmentClick() : fileInputRef.current?.click()} disabled={!allowAttachments || disabled} className="rounded-lg p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40" title="Đính kèm tài liệu"><Paperclip className="h-5 w-5" /></button><input ref={fileInputRef} type="file" multiple accept=".pdf,.doc,.docx,.txt" className="hidden" onChange={event => handleFiles(event.target.files)} /><span className="hidden text-xs text-slate-400 sm:inline">PDF, Word hoặc TXT · tối đa 10 MB</span></div>
+        <div className="flex items-center gap-3"><span className="text-[11px] text-slate-400">{message.length}/2000</span><button onClick={submit} disabled={!message.trim() || disabled || isSubmitting} className="flex h-9 w-9 items-center justify-center rounded-xl bg-[#173f73] text-white shadow-sm transition hover:bg-[#12345f] disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400" aria-label="Gửi câu hỏi"><ArrowUp className="h-5 w-5" /></button></div>
       </div>
     </div>
-  )
+    <p className="mt-2 flex items-center justify-center gap-1.5 text-[11px] text-slate-400"><ShieldCheck className="h-3.5 w-3.5" />Câu trả lời có thể cần được chuyên viên pháp lý kiểm tra lại</p>
+  </div>
 }

@@ -51,13 +51,11 @@ class LLMConfig:
     
     def get_llm(self):
         """Lấy LLM instance dựa trên cấu hình."""
-        from langchain_openai import ChatOpenAI
-        from langchain_google_genai import ChatGoogleGenerativeAI
-        from langchain_ollama import ChatOllama
         # HuggingFace models not supported in current setup
         # from langchain_huggingface import ChatHuggingFace
         
         if self.provider == LLMProvider.OPENAI:
+            from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model=self.model_name,
                 temperature=self.temperature,
@@ -67,6 +65,7 @@ class LLMConfig:
                 max_retries=self.MAX_RETRIES,
             )
         elif self.provider == LLMProvider.GOOGLE_GEMINI:
+            from langchain_google_genai import ChatGoogleGenerativeAI
             return ChatGoogleGenerativeAI(
                 model=self.model_name,
                 temperature=self.temperature,
@@ -76,12 +75,14 @@ class LLMConfig:
                 max_retries=self.MAX_RETRIES,
             )
         elif self.provider == LLMProvider.OLLAMA:
+            from langchain_ollama import ChatOllama
             return ChatOllama(
                 model=self.model_name,
                 temperature=self.temperature,
                 base_url=self.OLLAMA_BASE_URL,
-                timeout=self.REQUEST_TIMEOUT_SECONDS,
-                max_retries=self.MAX_RETRIES,
+                num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "4096")),
+                num_predict=self.max_tokens,
+                keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
             )
         elif self.provider == LLMProvider.HUGGINGFACE:
             raise NotImplementedError("HuggingFace models are currently not supported. Please use OpenAI, Google Gemini, or Ollama instead.")
@@ -96,13 +97,13 @@ class LLMConfig:
     # ============ CẤU HÌNH CHUNG ============
     
     # Số lượng chunk tối đa cần lấy cho mỗi query
-    TOP_K = 4
+    TOP_K = int(os.getenv("RAG_TOP_K", "3"))
     
     # Temperature cho LLM (0 = chính xác nhất, phù hợp cho pháp lý)
     TEMPERATURE = 0.0
     
     # Max tokens cho response (đủ dài để trả lời chi tiết)
-    MAX_TOKENS = 2000
+    MAX_TOKENS = int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "700"))
     REQUEST_TIMEOUT_SECONDS = float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "120"))
     MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
     
@@ -133,7 +134,7 @@ class LLMConfig:
     OLLAMA_MODEL = "llama3.2:3b"  # Hoặc "mistral", "qwen2.5"
     
     # Base URL Ollama (mặc định localhost:11434)
-    OLLAMA_BASE_URL = "http://localhost:11434"
+    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
     
     # ============ CẤU HÌNH HUGGINGFACE ============
     

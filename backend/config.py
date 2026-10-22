@@ -35,7 +35,7 @@ YAML_FRONTMATTER_PATTERN = r'^---\s*\n(.*?)\n^---\s*\n'
 # ^### Điều \d+\.: bắt đầu bằng ### và từ "Điều" theo sau số và dấu chấm
 # (.*?): nội dung của Điều (non-greedy)
 # (?=^###|$): lookahead để dừng khi gặp Điều tiếp theo hoặc kết thúc file
-ARTICLE_SPLIT_PATTERN = r'(^### Điều \d+\..*?(?=^###|$))'
+ARTICLE_SPLIT_PATTERN = r'(^### Điều \d+\..*?(?=^###|\Z))'
 
 # Regex pattern để phát hiện các chunk chưa kiểm chứng
 # [ĐỐI CHIẾU]: chuỗi chính xác này
