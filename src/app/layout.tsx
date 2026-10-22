@@ -13,8 +13,8 @@ const robotoMono = Roboto_Mono({
 })
 
 export const metadata: Metadata = {
-  title: "Legal AI Chatbot | Enterprise",
-  description: "Web Chatbot Phap Ly Noi Bo Doanh Nghiep voi AI va RAG integration",
+  title: "Legal AI | Trợ lý pháp lý cho doanh nghiệp",
+  description: "Tra cứu, đối chiếu và tổng hợp thông tin từ kho tài liệu pháp lý nội bộ bằng AI.",
 }
 
 export const viewport: Viewport = {
