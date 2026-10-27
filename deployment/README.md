@@ -1,95 +1,130 @@
-# Deploy Legal AI
+# Production deployment runbook
 
-Kiến trúc production:
+## 1. Target layout
 
-- Vercel chạy ứng dụng Next.js.
-- Một VPS Linux chạy FastAPI, Ollama và Qdrant local bằng Docker Compose.
-- Caddy chỉ công khai FastAPI qua HTTPS; Ollama không mở ra Internet.
-- Docker volumes giữ model embedding, model Ollama và vector database sau khi restart.
+See [ARCHITECTURE.md](./ARCHITECTURE.md). Vercel hosts Next.js. A Linux GPU
+host runs FastAPI, Qdrant Server, Ollama and Nginx on a private Docker network.
+Only TCP 80/443 are exposed publicly.
 
-## 1. Chuẩn bị máy chủ
+## 2. Prepare the host
 
-Khuyến nghị Ubuntu 24.04, tối thiểu 4 CPU, 8 GB RAM và 30 GB SSD. Máy có GPU NVIDIA sẽ phản hồi nhanh hơn đáng kể. Cài Git, Docker Engine và Docker Compose plugin.
+Install Docker Engine/Compose, NVIDIA Container Toolkit (GPU hosts), Git and
+Certbot. Allow inbound 80/443 in the cloud security group; deny 6333, 6334,
+8000 and 11434. Clone the repository and enter `deployment/`.
 
-Clone repository lên máy chủ rồi chuyển vào thư mục dự án:
-
-```bash
-git clone https://github.com/ngtiendat1105/Rag.git
-cd Rag
-```
-
-## 2. Cấu hình DNS
-
-Tại nơi quản lý DNS của `legalai.id.vn`, tạo bản ghi:
-
-```text
-Type: A
-Name: api
-Value: IP_PUBLIC_CUA_VPS
-Proxy: DNS only trong lần cấp chứng chỉ đầu tiên
-```
-
-Mở inbound TCP 80 và 443 trong firewall hoặc security group. Không mở cổng 8000 và 11434.
-
-## 3. Cấu hình backend
+Generate secrets without putting them in Git:
 
 ```bash
-cd deployment
 cp .env.example .env
-nano .env
+openssl rand -hex 32 # use one value for LEGALAI_API_KEY
+openssl rand -hex 32 # use a different value for QDRANT_API_KEY
+chmod 600 .env
 ```
 
-Thay `LEGALAI_API_KEY` bằng chuỗi bí mật dài. Giá trị này phải giống hệt biến cùng tên trên Vercel. Không commit file `deployment/.env`.
+Set `RAG_DOMAIN` and `CORS_ALLOWED_ORIGINS` to the real Vercel/custom domain.
 
-Khởi động hệ thống:
+## 3. Migrate the existing local Qdrant
+
+Install the backend requirements on a migration workstation, then run:
 
 ```bash
-docker compose up -d --build
-docker compose logs -f rag-api
+python deployment/scripts/migrate_qdrant.py \
+  --local-path backend/vector_db/qdrant_storage \
+  --remote-url https://qdrant.internal.example \
+  --remote-api-key "$QDRANT_API_KEY"
 ```
 
-Lần đầu có thể mất nhiều phút vì Docker tải model Ollama, model embedding và tạo vector index. Kiểm tra khi hoàn tất:
+For the bundled Compose stack, use `--remote-url http://127.0.0.1:6333` only
+if Qdrant is temporarily published through an SSH tunnel. Do not publish
+Qdrant directly to the Internet. Verify point count and run retrieval smoke
+tests before switching the API.
 
-```bash
-curl https://api.legalai.id.vn/health
-```
+## 4. Issue the TLS certificate
 
-Kết quả mong đợi:
-
-```json
-{"status":"ok","service":"legalai-rag"}
-```
-
-## 4. Cấu hình Vercel
-
-Trong Project Settings > Environment Variables, đặt cho Production, Preview và Development nếu cần:
+Point DNS `api.example.com` at the host. Before starting Nginx, issue a
+certificate using a host-installed Certbot and mount/copy its `/etc/letsencrypt`
+directory into the `letsencrypt` Docker volume, or use your cloud certificate
+manager. The Nginx template expects:
 
 ```text
-RAG_API_URL=https://api.legalai.id.vn
-LEGALAI_API_KEY=<cùng giá trị trong deployment/.env>
-RAG_REQUEST_TIMEOUT_MS=180000
+/etc/letsencrypt/live/${RAG_DOMAIN}/fullchain.pem
+/etc/letsencrypt/live/${RAG_DOMAIN}/privkey.pem
 ```
 
-Giữ các biến Supabase, Resend và `AUTH_SESSION_SECRET` hiện có. Sau khi thay biến, Redeploy dự án Vercel.
-
-## 5. Cập nhật tài liệu
-
-Sau khi thay file trong `backend/data_documents`, chạy trên VPS:
+The first deployment should start the included HTTP-only bootstrap override:
 
 ```bash
-cd deployment
-docker compose exec rag-api python /app/sync_documents.py
-docker compose restart rag-api
+mkdir -p certbot-www letsencrypt
+docker compose -f docker-compose.yml -f docker-compose.bootstrap.yml up -d --build
+certbot certonly --webroot -w certbot-www \
+  -d api.example.com
 ```
 
-## 6. Vận hành
+The certificate is now available under the bind-mounted `letsencrypt`
+directory. Then stop the bootstrap stack and start the normal compose file so
+the HTTPS server block is used.
+Renew before expiry and reload Nginx after renewal.
+
+## 5. Start and verify
 
 ```bash
-docker compose ps
-docker compose logs --tail=200 rag-api
-docker compose restart rag-api
-docker compose pull
+docker compose config
 docker compose up -d --build
+docker compose ps
+curl --fail https://api.example.com/health
+docker compose logs --tail=200 rag-api
 ```
 
-Sao lưu các volume `rag_vectors` và `rag_processed`, hoặc đảm bảo có thể dựng lại chúng từ `backend/data_documents`.
+The API container pulls the configured Ollama model on first start. Keep the
+API at one worker per GPU model instance; scale FastAPI only after moving
+Qdrant to a shared server and provisioning enough Ollama concurrency.
+
+## 6. Vercel configuration
+
+Set these server-side variables in Vercel (Production):
+
+```text
+RAG_API_URL=https://api.example.com
+LEGALAI_API_KEY=<same value as the backend>
+RAG_REQUEST_TIMEOUT_MS=300000
+```
+
+Do not prefix the API key with `NEXT_PUBLIC_`. Redeploy after changing it.
+The existing Next.js route already keeps the key server-side and aborts
+requests after the configured timeout.
+
+## 7. Backup and restore
+
+Run backups from `deployment/`:
+
+```bash
+QDRANT_API_KEY="$(sed -n 's/^QDRANT_API_KEY=//p' .env)" \
+  ./scripts/backup_qdrant.sh
+./scripts/restore_qdrant.sh ./backups/qdrant/legal_knowledge_base-*.snapshot
+```
+
+Encrypt backup files at rest, copy them to separate object storage, retain
+daily/weekly generations, and test restoration monthly. Never commit snapshots
+or `.env`.
+
+## 8. Security checklist
+
+- [ ] HTTPS only; redirect HTTP and enable TLS 1.2+.
+- [ ] Ports 6333/6334/8000/11434 blocked by firewall and not published.
+- [ ] `LEGALAI_API_KEY` and `QDRANT_API_KEY` are random, distinct, rotated,
+  and stored in Vercel encrypted variables or AWS Secrets Manager/SSM.
+- [ ] CORS contains only the real frontend origins; never use `*` with credentials.
+- [ ] Nginx request limits and FastAPI rate limits are enabled.
+- [ ] Container images are pinned, scanned, and rebuilt for security updates.
+- [ ] Qdrant snapshots and logs are encrypted; access is least-privilege.
+- [ ] SSH uses keys, a non-root user, MFA/bastion access and automatic patching.
+- [ ] Monitor `/health`, latency, 429/5xx rates, GPU memory and disk usage.
+- [ ] Backups are tested and their restore credentials are stored separately.
+
+## 9. High availability evolution
+
+Compose on one VPS is not zone-level HA. For HA, put two or more API replicas
+behind an AWS ALB/Cloud Run service, use Qdrant Cloud or a replicated Qdrant
+cluster, and run Ollama behind a private GPU load balancer with model capacity
+and queue limits. Keep document ingestion as a separate job so API replicas
+never rebuild the index concurrently.

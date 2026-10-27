@@ -88,9 +88,20 @@ def load_document(path: Path) -> Tuple[Dict[str, Any], str]:
 
 def _load_markdown(path: Path) -> Tuple[Dict[str, Any], str]:
     text = path.read_text(encoding="utf-8")
-    if text.startswith("---"):
-        parts = text.split("---", 2)
-        if len(parts) == 3:
-            import yaml
-            return dict(yaml.safe_load(parts[1]) or {}), parts[2].lstrip()
+    import re
+    frontmatter = re.match(r"^\s*\\?---\s*\n(.*?)\n\\?---\s*\n?", text, re.DOTALL)
+    if frontmatter:
+        import yaml
+        yaml_text = (
+            frontmatter.group(1)
+            .replace("\\_", "_")
+            .replace("\\[", "[")
+            .replace("\\]", "]")
+        )
+        metadata = dict(yaml.safe_load(yaml_text) or {})
+        metadata = {
+            str(key).replace("\\_", "_"): value
+            for key, value in metadata.items()
+        }
+        return metadata, text[frontmatter.end():].lstrip()
     return {"document_type": "markdown"}, text

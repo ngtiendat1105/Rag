@@ -82,7 +82,7 @@ Nội dung chương bốn.
 
 
 def test_commercial_law_checklist_is_indexable():
-    source = Path(__file__).with_name("data_documents") / "06_Luat_Thuong_mai_2005.md"
+    source = Path(__file__).resolve().parents[2] / "data_documents" / "06_Luat_Thuong_mai_2005.md"
     metadata, content = load_document(source)
     chunks = MarkdownChunker().create_chunks_with_metadata(content, metadata)
 
@@ -351,7 +351,7 @@ def test_rag_pipeline_handles_llm_timeout_error():
             return RunnableLambda(_raise_timeout)
 
     pipeline = RAGPipeline(config=TimeoutConfig(), retriever_service=FakeRetriever())
-    result = pipeline.query("test timeout")
+    result = pipeline.query("hợp đồng lao động timeout")
 
     assert "Lỗi hệ thống" in result["answer"]
     assert "LLM timeout" in result["answer"]

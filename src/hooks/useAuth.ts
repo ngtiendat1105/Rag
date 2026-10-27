@@ -140,7 +140,7 @@ export function useAuth() {
   /**
    * Require authentication
    */
-  const requireAuth = (redirectTo = '/login') => {
+  const useRequireAuth = (redirectTo = '/login') => {
     useEffect(() => {
       if (!isAuthenticated) {
         router.push(redirectTo)
@@ -151,12 +151,12 @@ export function useAuth() {
   /**
    * Require specific role
    */
-  const requireRole = (requiredRole: string, redirectTo = '/chat') => {
+  const useRequireRole = (requiredRole: string, redirectTo = '/chat') => {
     useEffect(() => {
-      if (!isAuthenticated || !hasRole(requiredRole)) {
+      if (!isAuthenticated || user?.role !== requiredRole) {
         router.push(redirectTo)
       }
-    }, [isAuthenticated, user, router, redirectTo, requiredRole])
+    }, [isAuthenticated, user?.role, router, redirectTo, requiredRole])
   }
 
   return {
@@ -178,8 +178,8 @@ export function useAuth() {
     hasPermission,
     
     // Guards
-    requireAuth,
-    requireRole,
+    requireAuth: useRequireAuth,
+    requireRole: useRequireRole,
     
     // Utilities
     clearError: () => setError(null),

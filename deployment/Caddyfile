@@ -1,4 +1,1 @@
-{$RAG_DOMAIN} {
-    encode zstd gzip
-    reverse_proxy rag-api:8000
-}
+# Deprecated. Production uses deployment/nginx/nginx.conf.

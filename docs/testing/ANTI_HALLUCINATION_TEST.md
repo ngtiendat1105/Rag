@@ -204,6 +204,41 @@ A: Chưa có thông tin về năm 2027.
 - ✅ PASS rate: **≥ 90%**
 - ⚠️ Hallucination: **0 lần**
 
+## 🧭 Bộ chỉ số RAG chuẩn hóa
+
+Evaluator tại `backend/evaluate_rag.py` xuất các chỉ số:
+
+- `retrieval_recall`: tỷ lệ các tài liệu/Điều mong đợi xuất hiện trong top-k.
+- `answer_faithfulness`: tỷ lệ claim có các thuật ngữ được chứng minh trong context.
+- `answer_relevance`: tỷ lệ thuật ngữ trọng tâm của câu hỏi xuất hiện trong câu trả lời.
+- `citation_accuracy`: tỷ lệ toàn bộ citation mong đợi khớp metadata tài liệu.
+- `unsupported_claim_rate`: tỷ lệ claim không được hỗ trợ; mục tiêu càng gần 0 càng tốt.
+- `refusal_accuracy`: tỷ lệ câu hỏi đánh dấu `expect_refusal` dùng đúng câu fallback.
+
+Chạy retrieval evaluation:
+
+```powershell
+python backend/evaluate_rag.py --dataset backend/evaluation/evaluation_dataset.json --top-k 5
+```
+
+`answer_faithfulness`, `answer_relevance` và `unsupported_claim_rate` là
+heuristic bảo thủ khi không truyền `answer_fn`; để đánh giá generation, adapter
+ứng dụng cần trả về `answer` và `context` cho cùng hàm `evaluate_results`.
+Không nên coi heuristic là bằng chứng pháp lý tuyệt đối; các ca fail cần được
+review thủ công hoặc đánh giá thêm bằng LLM judge đã kiểm duyệt.
+
+Mỗi case có thể gồm:
+
+```json
+{
+  "question": "Danh sách đầy đủ ... là gì?",
+  "relevant_documents": [],
+  "ground_truth": "Từ chối vì dữ liệu không đủ.",
+  "expected_citations": [],
+  "expect_refusal": true
+}
+```
+
 ---
 
 ## 💡 Tips

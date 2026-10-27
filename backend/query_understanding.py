@@ -35,6 +35,11 @@ INTENT_EXPANSIONS = {
 }
 
 DOCUMENT_ALIASES = {
+    "bhxh": "Luật Bảo hiểm xã hội 2024",
+    "bảo hiểm xã hội": "Luật Bảo hiểm xã hội 2024",
+    "nội dung hợp đồng lao động": "Bộ luật Lao động 2019",
+    "hợp đồng lao động": "Bộ luật Lao động 2019",
+    "bộ luật lao động": "Bộ luật Lao động 2019",
     "luật doanh nghiệp": "Luật Doanh nghiệp 2020",
     "luật thương mại": "Luật Thương mại 2005",
     "giao dịch điện tử": "Luật Giao dịch điện tử 2023",
@@ -46,6 +51,8 @@ DOCUMENT_ALIASES = {
 }
 
 DOCUMENT_SOURCE_FILES = {
+    "Luật Bảo hiểm xã hội 2024": "02_Luat_Bao_hiem_xa_hoi_2024.md",
+    "Bộ luật Lao động 2019": "01_Bo_luat_Lao_dong_2019.md",
     "Luật Doanh nghiệp 2020": "05_Luat_Doanh_nghiep_2020.md",
     "Luật Thương mại 2005": "06_Luat_Thuong_mai_2005.md",
     "Luật Giao dịch điện tử 2023": "11_Luat_Giao_dich_dien_tu_2023.md",

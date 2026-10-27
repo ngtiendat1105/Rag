@@ -3,6 +3,10 @@
     "question": "Hợp đồng lao động phải có những nội dung chủ yếu nào?",
     "expected_doc_id": "45/2019/QH14",
     "expected_article": "21",
+    "ground_truth": "Hợp đồng lao động phải có các nội dung chủ yếu theo Điều 21 của Bộ luật Lao động 2019.",
+    "expected_citations": [
+      {"document": "Bộ luật Lao động 2019", "article": "21"}
+    ],
     "expected_citation": {
       "document": "Bộ luật Lao động 2019",
       "article": "21"
@@ -12,6 +16,10 @@
     "question": "Hợp đồng lao động có thể giao kết bằng lời nói trong trường hợp nào?",
     "expected_doc_id": "45/2019/QH14",
     "expected_article": "14",
+    "ground_truth": "Hợp đồng lao động dưới một tháng có thể được giao kết bằng lời nói, trừ trường hợp pháp luật yêu cầu bằng văn bản.",
+    "expected_citations": [
+      {"document": "Bộ luật Lao động 2019", "article": "14", "clause": "2"}
+    ],
     "expected_citation": {
       "document": "Bộ luật Lao động 2019",
       "article": "14"
@@ -21,6 +29,10 @@
     "question": "Thời hạn của hợp đồng lao động xác định thời hạn tối đa bao lâu?",
     "expected_doc_id": "45/2019/QH14",
     "expected_article": "20",
+    "ground_truth": "Hợp đồng lao động xác định thời hạn có thời hạn tối đa theo nội dung của Điều 20 trong dữ liệu.",
+    "expected_citations": [
+      {"document": "Bộ luật Lao động 2019", "article": "20"}
+    ],
     "expected_citation": {
       "document": "Bộ luật Lao động 2019",
       "article": "20"
@@ -30,9 +42,20 @@
     "question": "Người sử dụng lao động có được giữ bản chính giấy tờ của người lao động không?",
     "expected_doc_id": "45/2019/QH14",
     "expected_article": "17",
+    "ground_truth": "Người sử dụng lao động không được giữ bản chính giấy tờ của người lao động.",
+    "expected_citations": [
+      {"document": "Bộ luật Lao động 2019", "article": "17", "clause": "1"}
+    ],
     "expected_citation": {
       "document": "Bộ luật Lao động 2019",
       "article": "17"
     }
+  },
+  {
+    "question": "Danh sách đầy đủ ngành, nghề đầu tư kinh doanh có điều kiện theo Phụ lục IV Luật Đầu tư hiện hành là gì?",
+    "relevant_documents": [],
+    "ground_truth": "Từ chối vì dữ liệu hiện tại không chứa danh sách đầy đủ này.",
+    "expected_citations": [],
+    "expect_refusal": true
   }
 ]

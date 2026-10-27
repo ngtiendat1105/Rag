@@ -4,10 +4,10 @@ Chứa tham số LLM, model selection, và cấu hình retrieval
 """
 
 import os
-from typing import Any
-from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from enum import Enum
+
+from settings import SettingsProvider, settings
 
 class LLMProvider(Enum):
     """Các nhà cung cấp LLM được hỗ trợ"""
@@ -96,16 +96,18 @@ class LLMConfig:
     
     # ============ CẤU HÌNH CHUNG ============
     
-    # Số lượng chunk tối đa cần lấy cho mỗi query
-    TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+    # Số chunk trả cho pipeline sau rerank. Candidates được lấy rộng hơn.
+    TOP_K = settings.rag_top_k
+    RETRIEVAL_TOP_K = settings.effective_retrieval_top_k
+    RERANK_TOP_N = settings.rag_rerank_top_n
     
     # Temperature cho LLM (0 = chính xác nhất, phù hợp cho pháp lý)
     TEMPERATURE = 0.0
     
     # Max tokens cho response (đủ dài để trả lời chi tiết)
-    MAX_TOKENS = int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "700"))
-    REQUEST_TIMEOUT_SECONDS = float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "120"))
-    MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+    MAX_TOKENS = settings.rag_max_output_tokens
+    REQUEST_TIMEOUT_SECONDS = settings.llm_request_timeout_seconds
+    MAX_RETRIES = settings.llm_max_retries
     
     # ============ CẤU HÌNH PROVIDER MẶC ĐỊNH ============
     
@@ -118,7 +120,7 @@ class LLMConfig:
     OPENAI_MODEL = "gpt-3.5-turbo"  # Hoặc "gpt-4-turbo-preview"
     
     # API key OpenAI (lấy từ biến môi trường)
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY = settings.openai_api_key
     
     # ============ CẤU HÌNH GOOGLE GEMINI ============
     
@@ -126,15 +128,15 @@ class LLMConfig:
     GEMINI_MODEL = "gemini-1.5-pro"  # Hoặc "gemini-1.5-flash"
     
     # API key Google AI (lấy từ biến môi trường)
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_API_KEY = settings.google_api_key
     
     # ============ CẤU HÌNH OLLAMA ============
     
     # Model Ollama local (các model hỗ trợ tiếng Việt)
-    OLLAMA_MODEL = "llama3.2:3b"  # Hoặc "mistral", "qwen2.5"
+    OLLAMA_MODEL = settings.rag_llm_model
     
     # Base URL Ollama (mặc định localhost:11434)
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_BASE_URL = settings.ollama_base_url
     
     # ============ CẤU HÌNH HUGGINGFACE ============
     
@@ -147,10 +149,10 @@ class LLMConfig:
     # ============ CẤU HÌNH RETRIEVAL ============
     
     # Ngưỡng similarity tối thiểu cho retrieval
-    SIMILARITY_THRESHOLD = 0.3
+    SIMILARITY_THRESHOLD = settings.rag_similarity_threshold
     
     # Có sử dụng metadata filtering không
-    USE_METADATA_FILTERING = False
+    USE_METADATA_FILTERING = settings.rag_use_metadata_filtering
     
     # Bộ lọc metadata mặc định (từ Giai đoạn 2)
     DEFAULT_METADATA_FILTER = {
@@ -191,29 +193,29 @@ class LLMConfig:
         
         if provider == LLMProvider.OPENAI:
             config.update({
-                "model": cls.OPENAI_MODEL,
-                "api_key": cls.OPENAI_API_KEY,
-                "requires_api_key": bool(cls.OPENAI_API_KEY)
+                "model": self.model_name,
+                "api_key": self.OPENAI_API_KEY,
+                "requires_api_key": bool(self.OPENAI_API_KEY)
             })
         
         elif provider == LLMProvider.GOOGLE_GEMINI:
             config.update({
-                "model": cls.GEMINI_MODEL,
-                "api_key": cls.GOOGLE_API_KEY,
-                "requires_api_key": bool(cls.GOOGLE_API_KEY)
+                "model": self.model_name,
+                "api_key": self.GOOGLE_API_KEY,
+                "requires_api_key": bool(self.GOOGLE_API_KEY)
             })
         
         elif provider == LLMProvider.OLLAMA:
             config.update({
-                "model": cls.OLLAMA_MODEL,
-                "base_url": cls.OLLAMA_BASE_URL,
+                "model": self.model_name,
+                "base_url": self.OLLAMA_BASE_URL,
                 "requires_api_key": False
             })
         
         elif provider == LLMProvider.HUGGINGFACE:
             config.update({
-                "model": cls.HUGGINGFACE_MODEL,
-                "device": cls.HUGGINGFACE_DEVICE,
+                "model": self.model_name,
+                "device": self.HUGGINGFACE_DEVICE,
                 "requires_api_key": False
             })
         

@@ -4,7 +4,7 @@ Cấu hình này sử dụng HuggingFace local model và disable các tính năn
 """
 
 import os
-from pathlib import Path
+from typing import Dict
 from config_llm import LLMConfig, LLMProvider
 
 class LocalLLMConfig(LLMConfig):
@@ -26,12 +26,12 @@ class LocalLLMConfig(LLMConfig):
     # Override: Tắt tất cả các API keys
     @classmethod
     def check_api_keys(cls) -> Dict[str, bool]:
-        """Kiểm tra API keys - luôn trả về True cho local"""
+        """Report which local providers are actually available."""
         return {
-            "openai": True,  # Giả lập
-            "google_gemini": True,  # Giả lập
-            "huggingface": True,  # Local không cần API key
-            "ollama": True  # Local không cần API key
+            "openai": False,
+            "google_gemini": False,
+            "huggingface": False,
+            "ollama": True,
         }
     
     def _get_default_model_name(self, provider: LLMProvider) -> str:
@@ -44,33 +44,10 @@ class LocalLLMConfig(LLMConfig):
     def get_llm(self):
         """Override để sử dụng HuggingFace local với cài đặt đặc biệt"""
         if self.provider == LLMProvider.HUGGINGFACE:
-            try:
-                from langchain_huggingface import HuggingFacePipeline
-                from transformers import AutoModelForSeq2SeqLM, AutoTokenizer, pipeline
-                
-                print("🔄 Đang tải HuggingFace local model...")
-                
-                # Model nhẹ hơn cho local testing
-                model_id = "google/flan-t5-base"  # Thậm chí nhẹ hơn
-                tokenizer = AutoTokenizer.from_pretrained(model_id)
-                model = AutoModelForSeq2SeqLM.from_pretrained(model_id)
-                
-                # Tạo pipeline
-                pipe = pipeline(
-                    "text2text-generation",
-                    model=model,
-                    tokenizer=tokenizer,
-                    max_length=512,
-                    temperature=self.temperature
-                )
-                
-                llm = HuggingFacePipeline(pipeline=pipe)
-                print(f"✅ HuggingFace local model đã tải: {model_id}")
-                return llm
-                
-            except ImportError:
-                print("⚠️  Không tìm thấy langchain_huggingface. Sử dụng fallback...")
-                return super().get_llm()
+            raise NotImplementedError(
+                "HuggingFace local inference is not supported by this project. "
+                "Use Ollama for local testing."
+            )
         
         return super().get_llm()
 
@@ -88,7 +65,7 @@ def configure_for_local_testing():
     os.environ["USE_LOCAL_ONLY"] = "true"
     
     print("✅ Đã cấu hình cho local testing")
-    print("   - Sử dụng HuggingFace local model")
+    print("   - Sử dụng Ollama local model")
     print("   - Tất cả API keys disabled")
     print("   - Chế độ local-only activated")
 

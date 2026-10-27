@@ -19,9 +19,17 @@ if TYPE_CHECKING:
 
 
 app = FastAPI(title="LegalAI RAG API", version="1.0.0")
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "https://legalai.id.vn,https://www.legalai.id.vn",
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://legalai.id.vn", "https://www.legalai.id.vn"],
+    allow_origins=configured_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "X-API-Key"],

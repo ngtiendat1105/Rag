@@ -23,6 +23,13 @@ logger = logging.getLogger(__name__)
 MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "8000"))
 MAX_CONTEXT_DOCUMENTS = int(os.getenv("RAG_MAX_CONTEXT_DOCUMENTS", "3"))
 LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "1"))
+INSUFFICIENT_EVIDENCE_RESPONSE = (
+    "Hiện tại chưa đủ căn cứ pháp lý trong dữ liệu hệ thống để trả lời câu hỏi này"
+)
+LEGAL_DISCLAIMER = (
+    "Lưu ý: Thông tin do AI tổng hợp chỉ mang tính chất tham khảo. "
+    "Kết quả cần được kiểm tra lại bởi chuyên viên pháp lý trước khi áp dụng."
+)
 
 
 class RAGPipeline:
@@ -71,7 +78,7 @@ class RAGPipeline:
         return chain
 
     def _build_prompt(self, question: str, raw_docs: List[Any]) -> str:
-        """Build a bounded prompt from the documents returned by one retrieval."""
+        """Build a bounded, evidence-only prompt for the generation model."""
         context_parts = []
         remaining = MAX_CONTEXT_CHARS
         for i, doc in enumerate(raw_docs[:MAX_CONTEXT_DOCUMENTS], 1):
@@ -90,7 +97,22 @@ class RAGPipeline:
             remaining -= len(block)
 
         context = "\n".join(context_parts)
-        return f"""Bạn là chuyên gia pháp lý về luật lao động Việt Nam.
+        return f"""BẠN LÀ TRỢ LÝ TRA CỨU PHÁP LÝ NỘI BỘ.
+
+QUY TẮC AN TOÀN BẮT BUỘC:
+1. Chỉ sử dụng thông tin xuất hiện trực tiếp trong TÀI LIỆU THAM KHẢO.
+2. Nếu tài liệu không đủ căn cứ, chỉ trả lời đúng câu:
+   "{INSUFFICIENT_EVIDENCE_RESPONSE}"
+3. Không dùng kiến thức nền, không suy đoán, không tự bổ sung danh sách,
+   số tiền, thời hạn, tỷ lệ, điều kiện hoặc tên điều luật.
+4. Mỗi khẳng định pháp lý phải kèm nguồn theo dạng
+   [Tên văn bản - Điều - Khoản]. Không tự tạo số Điều/Khoản.
+5. Phân biệt rõ các mục: "Quy định pháp luật", "Quy định công ty",
+   "Gợi ý/Lưu ý tham khảo". Chỉ tạo mục nào có dữ liệu trong context.
+6. Không lặp lại một ý hoặc một mục trong danh sách. Không kéo dài câu trả lời
+   bằng cách lặp từ khóa.
+7. Cuối câu trả lời luôn thêm đúng cảnh báo:
+   "{LEGAL_DISCLAIMER}"
 
 CÂU HỎI: {question}
 
@@ -98,10 +120,8 @@ TÀI LIỆU THAM KHẢO:
 {context}
 
 YÊU CẦU:
-- Trả lời DỰA TRÊN tài liệu trên
-- Sử dụng tiếng Việt rõ ràng, dễ hiểu
-- Nêu nguồn văn bản nếu có
-- NẾU không có thông tin, nói rõ "Tài liệu hiện tại không có thông tin về vấn đề này"
+- Trả lời ngắn gọn, đúng trọng tâm bằng tiếng Việt.
+- Nếu context chỉ có một phần thông tin, nêu rõ giới hạn thay vì đoán.
 
 TRẢ LỜI:"""
 
@@ -179,8 +199,9 @@ TRẢ LỜI:"""
 
             if not raw_docs:
                 answer = (
-                    "Dữ liệu hiện tại không chứa thông tin về câu hỏi này. "
-                    "Vui lòng tham khảo văn bản pháp luật chính thức hoặc liên hệ phòng pháp chế."
+                    f"{INSUFFICIENT_EVIDENCE_RESPONSE}\n"
+                    "Dữ liệu hiện tại không chứa thông tin đủ để trả lời câu hỏi này.\n\n"
+                    f"{LEGAL_DISCLAIMER}"
                 )
             else:
                 answer = self._invoke_with_retry(self._build_prompt(question, raw_docs))

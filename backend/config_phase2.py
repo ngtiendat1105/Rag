@@ -6,6 +6,8 @@ Chứa model, đường dẫn DB, batch_size, và từ khóa nhận diện câu 
 import os
 from pathlib import Path
 
+from settings import settings
+
 # ============ CẤU HÌNH ĐƯỜNG DẪN ============
 
 # Đường dẫn gốc workspace
@@ -85,7 +87,7 @@ DEFAULT_FILTER_CONDITIONS = {
 }
 
 # Ngưỡng similarity tối thiểu (cosine similarity)
-MIN_SIMILARITY_THRESHOLD = 0.3
+MIN_SIMILARITY_THRESHOLD = settings.rag_similarity_threshold
 
 # ============ CẤU HÌNH LOGGING & DEBUG ============
 

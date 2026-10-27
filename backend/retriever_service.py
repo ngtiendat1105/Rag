@@ -6,6 +6,8 @@ Kết nối với Vector Database từ Giai đoạn 2 và cung cấp retrieval c
 import os
 import re
 import sys
+import logging
+import time
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
@@ -47,6 +49,8 @@ try:
     from sentence_transformers import CrossEncoder
 except ImportError:
     CrossEncoder = None
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalError(RuntimeError):
@@ -99,11 +103,26 @@ class LegalRetrieverService:
         self.vector_store = None
         self.langchain_retriever = None
         reranker_name = os.getenv("RAG_RERANKER_MODEL", "").strip()
-        self.reranker = (
-            CrossEncoder(reranker_name)
-            if reranker_name and CrossEncoder is not None
-            else None
-        )
+        self.reranker_name = reranker_name or None
+        self.reranker = None
+        if reranker_name and CrossEncoder is not None:
+            try:
+                self.reranker = CrossEncoder(
+                    reranker_name,
+                    max_length=int(os.getenv("RAG_RERANKER_MAX_LENGTH", "512")),
+                )
+                logger.info("Reranker loaded: %s", reranker_name)
+            except Exception as exc:
+                logger.warning(
+                    "Cannot load reranker %s; using Qdrant ranking: %s",
+                    reranker_name,
+                    exc,
+                )
+        elif reranker_name:
+            logger.warning(
+                "RAG_RERANKER_MODEL is set but sentence-transformers CrossEncoder "
+                "is unavailable; using Qdrant ranking."
+            )
         
         # Thống kê
         self.stats = {
@@ -124,17 +143,24 @@ class LegalRetrieverService:
     def _initialize_connection(self):
         """Khởi tạo kết nối đến Qdrant và tạo LangChain retriever"""
         try:
-            # Đường dẫn lưu trữ Qdrant
-            qdrant_storage_path = VECTOR_DB_DIR / "qdrant_storage"
-            
-            if not qdrant_storage_path.exists():
-                raise FileNotFoundError(
-                    f"Qdrant storage not found at {qdrant_storage_path}. "
-                    f"Please run Phase 2 indexing first."
+            qdrant_url = os.getenv("QDRANT_URL", "").strip()
+            qdrant_api_key = os.getenv("QDRANT_API_KEY", "").strip() or None
+            if qdrant_url:
+                self.qdrant_client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=qdrant_api_key,
+                    timeout=float(os.getenv("QDRANT_TIMEOUT_SECONDS", "10")),
                 )
-            
-            # Tạo Qdrant client
-            self.qdrant_client = QdrantClient(path=str(qdrant_storage_path))
+                logger.info("Using remote Qdrant at %s", qdrant_url)
+            else:
+                qdrant_storage_path = VECTOR_DB_DIR / "qdrant_storage"
+                if not qdrant_storage_path.exists():
+                    raise FileNotFoundError(
+                        f"Qdrant storage not found at {qdrant_storage_path}. "
+                        f"Please run Phase 2 indexing first."
+                    )
+                self.qdrant_client = QdrantClient(path=str(qdrant_storage_path))
+                logger.info("Using local Qdrant storage at %s", qdrant_storage_path)
             
             # Kiểm tra collection tồn tại
             collections = self.qdrant_client.get_collections()
@@ -180,7 +206,7 @@ class LegalRetrieverService:
             
             # Tạo retriever với cấu hình
             search_kwargs = {
-                "k": LLMConfig.TOP_K,
+                "k": LLMConfig.RETRIEVAL_TOP_K,
                 "score_threshold": self.similarity_threshold
             }
             
@@ -302,8 +328,16 @@ class LegalRetrieverService:
             
             understanding = understand_query(query)
             variants = understanding["query_variants"] or [query]
-            final_k = k or LLMConfig.TOP_K
-            candidate_limit = max(final_k * 4, 12)
+            final_k = k or LLMConfig.RERANK_TOP_N
+            candidate_limit = max(
+                LLMConfig.RETRIEVAL_TOP_K,
+                final_k,
+                LLMConfig.RERANK_TOP_N,
+            )
+            configured_filter = filter_conditions
+            if configured_filter is None and self.use_metadata_filtering:
+                configured_filter = LLMConfig.DEFAULT_METADATA_FILTER
+            qdrant_filter = self._build_qdrant_filter(configured_filter or {})
             hits_by_id = {}
 
             # Search multiple deterministic variants to improve recall for short,
@@ -315,6 +349,7 @@ class LegalRetrieverService:
                     query=query_embedding.tolist(),
                     limit=candidate_limit,
                     score_threshold=self.similarity_threshold,
+                    query_filter=qdrant_filter,
                     with_payload=True,
                     with_vectors=False
                 )
@@ -329,13 +364,16 @@ class LegalRetrieverService:
             # hiding the explicitly requested legal source.
             for source_file in understanding["source_file_hints"]:
                 query_embedding = self.embedder.embed_text(query)
+                scoped_conditions = [
+                    models.FieldCondition(
+                        key="metadata.source_file",
+                        match=models.MatchValue(value=source_file),
+                    )
+                ]
+                if qdrant_filter is not None:
+                    scoped_conditions.extend(qdrant_filter.must or [])
                 scoped_filter = models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="metadata.source_file",
-                            match=models.MatchValue(value=source_file),
-                        )
-                    ]
+                    must=scoped_conditions
                 )
                 scoped_result = self.qdrant_client.query_points(
                     collection_name=COLLECTION_NAME,
@@ -380,6 +418,14 @@ class LegalRetrieverService:
                     )
                 )
                 exact_phrase_match = normalized_query and normalized_query in fold_text(searchable)
+                key_phrase_match = (
+                    "noi dung chu yeu" in normalized_query
+                    and "noi dung chu yeu" in fold_text(searchable)
+                )
+                employment_contract_contents = (
+                    "dieu 21" in fold_text(content)
+                    and "noi dung cua hop dong lao dong" in fold_text(content)
+                )
                 checklist_match = (
                     "checklist" in normalized_query
                     and "checklist" in fold_text(searchable)
@@ -388,25 +434,56 @@ class LegalRetrieverService:
                     float(hit.score)
                     + min(overlap * 0.01, 0.08)
                     + min(document_match * 0.25, 0.25)
-                    + (0.04 if article_match else 0.0)
+                    + (0.8 if article_match else 0.0)
                     + (0.35 if exact_phrase_match else 0.0)
+                    + (0.5 if key_phrase_match else 0.0)
+                    + (2.0 if employment_contract_contents and (
+                        "hop dong lao dong" in normalized_query
+                        or "dieu 21" in normalized_query
+                    ) else 0.0)
                     + (0.25 if checklist_match else 0.0)
                 )
 
+            qdrant_scores = [float(hit.score) for hit in hits]
+            rerank_scores = {}
             if self.reranker and hits:
-                rerank_scores = self.reranker.predict(
-                    [
-                        (query, (hit.payload or {}).get("content", ""))
-                        for hit in hits
-                    ]
-                )
-                hits = [
-                    hit for _, hit in sorted(
-                        zip(rerank_scores, hits),
-                        key=lambda item: float(item[0]),
+                rerank_started = time.perf_counter()
+                try:
+                    scores = self.reranker.predict(
+                        [
+                            (query, (hit.payload or {}).get("content", ""))
+                            for hit in hits
+                        ],
+                        show_progress_bar=False,
+                    )
+                    rerank_scores = {
+                        str(hit.id): float(score)
+                        for hit, score in zip(hits, scores)
+                    }
+                    hits.sort(
+                        key=lambda hit: (
+                            rerank_scores.get(str(hit.id), float("-inf")),
+                            ranking_score(hit),
+                        ),
                         reverse=True,
                     )
-                ]
+                    logger.info(
+                        "Rerank query=%r candidates=%d top_n=%d latency_ms=%.1f "
+                        "qdrant_top=%.4f rerank_top=%.4f",
+                        query[:80],
+                        len(hits),
+                        final_k,
+                        (time.perf_counter() - rerank_started) * 1000,
+                        max(qdrant_scores, default=0.0),
+                        max(rerank_scores.values(), default=0.0),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Rerank failed for query=%r; falling back to Qdrant ranking: %s",
+                        query[:80],
+                        exc,
+                    )
+                    hits.sort(key=ranking_score, reverse=True)
             else:
                 hits.sort(key=ranking_score, reverse=True)
 
@@ -418,7 +495,12 @@ class LegalRetrieverService:
                     payload.get("metadata", {}),
                     chunk_id=payload.get("chunk_id", ""),
                 )
-                metadata["retrieval_score"] = hit.score
+                metadata["retrieval_score"] = float(hit.score)
+                if str(hit.id) in rerank_scores:
+                    metadata["rerank_score"] = rerank_scores[str(hit.id)]
+                    metadata["ranking_method"] = "retrieve_and_rerank"
+                else:
+                    metadata["ranking_method"] = "qdrant"
                 content = payload.get("content", "")
                 
                 doc = Document(

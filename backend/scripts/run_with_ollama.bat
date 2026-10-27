@@ -17,11 +17,13 @@ if errorlevel 1 (
 echo ✅ Ollama is installed
 
 REM 2. Check if model exists
-echo [2] Checking Llama model...
-ollama list | findstr "llama3" >nul
+echo [2] Checking configured Llama model...
+set "RAG_MODEL=%RAG_LLM_MODEL%"
+if "%RAG_MODEL%"=="" set "RAG_MODEL=llama3.2:latest"
+ollama list | findstr /I "%RAG_MODEL%" >nul
 if errorlevel 1 (
-    echo Llama model not found. Pulling llama3.2:3b...
-    ollama pull llama3.2:3b
+    echo Model %RAG_MODEL% not found. Pulling...
+    ollama pull %RAG_MODEL%
 ) else (
     echo ✅ Llama model found
 )
@@ -47,6 +49,6 @@ echo ========================================
 echo  LEGAL RAG CHATBOT - OLLAMA MODE
 echo ========================================
 echo.
-python main_chat.py --provider ollama --model llama3.2:3b
+python main_chat.py --provider ollama --model %RAG_MODEL%
 
 pause
