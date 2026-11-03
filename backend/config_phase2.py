@@ -4,6 +4,7 @@ Chứa model, đường dẫn DB, batch_size, và từ khóa nhận diện câu 
 """
 
 import os
+import tempfile
 from pathlib import Path
 
 from settings import settings
@@ -16,9 +17,13 @@ WORKSPACE_ROOT = Path(__file__).parent
 # Đường dẫn đến file JSONL đầu vào từ Giai đoạn 1
 INPUT_JSONL_PATH = WORKSPACE_ROOT / "processed_output" / "processed_knowledge_base.jsonl"
 
-# Thư mục chứa Vector Database (Qdrant local)
-VECTOR_DB_DIR = WORKSPACE_ROOT / "vector_db"
-VECTOR_DB_DIR.mkdir(exist_ok=True)
+# Thư mục chứa Vector Database (Qdrant local). Lambda's /var/task is read-only;
+# remote Qdrant is used in production, so any compatibility path belongs in /tmp.
+if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    VECTOR_DB_DIR = Path(tempfile.gettempdir()) / "legalai" / "vector_db"
+else:
+    VECTOR_DB_DIR = WORKSPACE_ROOT / "vector_db"
+VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
 
 # Qdrant collection name
 COLLECTION_NAME = "legal_knowledge_base"
