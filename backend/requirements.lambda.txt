@@ -1,0 +1,11 @@
+fastapi
+mangum
+numpy
+qdrant-client
+sentence-transformers
+langchain
+langchain-core
+langchain-community
+langchain-qdrant
+langchain-google-genai
+python-dotenv

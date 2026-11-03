@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Production deployment runbook
 
 ## 1. Target layout
@@ -128,3 +129,50 @@ behind an AWS ALB/Cloud Run service, use Qdrant Cloud or a replicated Qdrant
 cluster, and run Ollama behind a private GPU load balancer with model capacity
 and queue limits. Keep document ingestion as a separate job so API replicas
 never rebuild the index concurrently.
+=======
+# LegalAI AWS deployment
+
+Production uses AWS Lambda (container image) for FastAPI, API Gateway HTTP API,
+Qdrant Cloud, Google Gemini, and Amplify Hosting for Next.js. Supabase and
+Resend remain the application data and OTP services.
+
+## Build and push the Lambda image
+
+Run from the repository root with Docker Desktop running:
+
+```powershell
+$region = "us-east-1"
+$accountId = aws sts get-caller-identity --query Account --output text
+$ecrUri = "$accountId.dkr.ecr.$region.amazonaws.com/legalai-rag"
+
+aws ecr create-repository --repository-name legalai-rag --region $region
+aws ecr get-login-password --region $region |
+  docker login --username AWS --password-stdin "$accountId.dkr.ecr.$region.amazonaws.com"
+
+docker buildx build --platform linux/amd64 `
+  -f deployment/lambda/Dockerfile `
+  -t "$ecrUri:latest" `
+  --push .
+```
+
+Create Lambda from the image and set `RAG_LLM_PROVIDER=google_gemini`,
+`RAG_LLM_MODEL=gemini-3.5-flash-lite`, `GOOGLE_API_KEY`, `QDRANT_URL`,
+`QDRANT_API_KEY`, and `LEGALAI_API_KEY`. For the demo use 4096 MB memory and
+a 120-second timeout.
+
+## API Gateway
+
+Create an HTTP API integrated with the Lambda function. Add a `$default` route
+or `ANY /{proxy+}` and copy its invoke URL. Test `/health` and `POST /api/chat`
+before configuring the frontend.
+
+## Amplify
+
+Connect the Git repository and keep the root `amplify.yml`. Add these Amplify
+environment variables: `RAG_API_URL`, `LEGALAI_API_KEY`,
+`RAG_REQUEST_TIMEOUT_MS`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+`AUTH_SESSION_SECRET`, `RESEND_API_KEY`, and `RESEND_FROM_EMAIL`.
+
+Keep `GOOGLE_API_KEY` and `QDRANT_API_KEY` in Lambda only. Redeploy Amplify
+after changing variables.
+>>>>>>> 81ecfc7 (Add AWS Lambda and Amplify deployment)
