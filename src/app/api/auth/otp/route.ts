@@ -5,8 +5,20 @@ import { createSession, SESSION_COOKIE } from '@/lib/session'
 
 export const runtime = 'nodejs'
 
+function isSameOrigin(request: NextRequest) {
+  const origin = request.headers.get('origin')
+  if (!origin) return false
+  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
+  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || 'https'
+  const host = request.headers.get('host')
+  const allowed = new Set([request.nextUrl.origin])
+  if (host) allowed.add(`${forwardedProto}://${host}`)
+  if (forwardedHost) allowed.add(`${forwardedProto}://${forwardedHost}`)
+  return allowed.has(origin)
+}
+
 export async function POST(request: NextRequest) {
-  if (request.headers.get('origin') !== request.nextUrl.origin) {
+  if (!isSameOrigin(request)) {
     return NextResponse.json({ message: 'Yêu cầu không hợp lệ.' }, { status: 403 })
   }
   try {
