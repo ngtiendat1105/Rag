@@ -160,7 +160,7 @@ export default function ChatMessage({
 
             {/* References section */}
             {isAI && references.length > 0 && (
-              <div className="mt-4 pt-4 border-t border-dark-border/30">
+              <div className="mt-4 pt-4">
                 <button
                   onClick={() => setShowReferences(!showReferences)}
                   className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"

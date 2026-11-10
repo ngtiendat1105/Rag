@@ -49,6 +49,7 @@ interface ChatState {
   // Actions
   setActiveChat: (chatId: string) => void
   createNewChat: (title?: string) => Chat
+  createWelcomeChat: (userName: string) => Chat
   sendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>
   deleteChat: (chatId: string) => void
   archiveChat: (chatId: string) => void
@@ -88,6 +89,27 @@ export const useChatStore = create<ChatState>((set, get) => ({
       activeChatId: newChat.id,
     }))
     
+    return newChat
+  },
+
+  createWelcomeChat: (userName: string) => {
+    const now = new Date().toISOString()
+    const newChat: Chat = {
+      id: generateChatId(),
+      title: `Xin chào ${userName}`,
+      lastMessage: `Xin chào ${userName}`,
+      timestamp: now,
+      unread: false,
+      status: 'active',
+      messages: [{
+        id: `msg_${Date.now()}_welcome`,
+        role: 'assistant',
+        content: `Xin chào ${userName}! Tôi là Legal AI, trợ lý hỗ trợ tra cứu các vấn đề pháp lý nội bộ. Bạn muốn tra cứu nội dung nào hôm nay?`,
+        timestamp: now,
+        status: 'sent',
+      }],
+    }
+    set(state => ({ chats: [newChat, ...state.chats], activeChatId: newChat.id }))
     return newChat
   },
 
