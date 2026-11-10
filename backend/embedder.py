@@ -8,12 +8,7 @@ import time
 from typing import List, Optional, Union
 import numpy as np
 
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("⚠️ Warning: sentence-transformers not installed. Please install with: pip install sentence-transformers")
+SentenceTransformer = None
 
 from config_phase2 import (
     VIETNAMESE_EMBEDDING_MODEL, 
@@ -21,6 +16,7 @@ from config_phase2 import (
     EMBEDDING_DEVICE,
     VERBOSE_LOGGING
 )
+from settings import settings
 
 
 class VietnameseEmbedder:
@@ -41,10 +37,15 @@ class VietnameseEmbedder:
             ImportError: Nếu sentence-transformers chưa được cài đặt
             RuntimeError: Nếu không thể tải model
         """
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            raise ImportError(
-                "sentence-transformers is required. Install with: pip install sentence-transformers"
-            )
+        global SentenceTransformer
+        if SentenceTransformer is None:
+            try:
+                from sentence_transformers import SentenceTransformer as _SentenceTransformer
+                SentenceTransformer = _SentenceTransformer
+            except ImportError as exc:
+                raise ImportError(
+                    "sentence-transformers is required for local embeddings"
+                ) from exc
         
         # Sử dụng model từ config nếu không chỉ định
         self.model_name = model_name or VIETNAMESE_EMBEDDING_MODEL
@@ -255,8 +256,12 @@ class VietnameseEmbedder:
 
 # ============ FACTORY FUNCTION & TEST ============
 
-def create_vietnamese_embedder(model_name: Optional[str] = None, device: Optional[str] = None) -> VietnameseEmbedder:
-    """Factory function để tạo VietnameseEmbedder"""
+def create_vietnamese_embedder(model_name: Optional[str] = None, device: Optional[str] = None):
+    """Create the configured embedder without importing torch on Bedrock Lambda."""
+    provider = settings.rag_embedding_provider.strip().lower()
+    if provider == "bedrock":
+        from bedrock_embedder import BedrockEmbedder
+        return BedrockEmbedder(model_name=model_name, dimension=settings.rag_embedding_dimension, region_name=settings.bedrock_region)
     return VietnameseEmbedder(model_name=model_name, device=device)
 
 
