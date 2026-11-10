@@ -191,11 +191,6 @@ html.dark .chat-professional h3 {
   color: #f8fafc;
 }
 
-html.dark .chat-professional p,
-html.dark .chat-professional span {
-  color: #c7d4e7;
-}
-
 html.dark .chat-professional textarea,
 html.dark .chat-professional input {
   color: #f8fafc;
@@ -224,6 +219,11 @@ html.dark .chat-professional .markdown-content pre {
 
 html.dark .chat-professional .markdown-content blockquote {
   color: #c7d4e7;
+}
+
+/* Theme switching is exposed as the compact labeled toggle in the header. */
+.chat-professional .absolute.right-0.top-12 > button:first-child {
+  display: none;
 }
 
 /* Text selection */
