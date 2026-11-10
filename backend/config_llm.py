@@ -15,6 +15,7 @@ class LLMProvider(Enum):
     GOOGLE_GEMINI = "google_gemini"
     OLLAMA = "ollama"
     HUGGINGFACE = "huggingface"
+    BEDROCK = "bedrock"
 
 
 class LLMConfig:
@@ -46,6 +47,8 @@ class LLMConfig:
             return self.OLLAMA_MODEL
         elif provider == LLMProvider.HUGGINGFACE:
             return self.HUGGINGFACE_MODEL
+        elif provider == LLMProvider.BEDROCK:
+            return self.BEDROCK_MODEL
         else:
             return "unknown"
     
@@ -54,7 +57,16 @@ class LLMConfig:
         # HuggingFace models not supported in current setup
         # from langchain_huggingface import ChatHuggingFace
         
-        if self.provider == LLMProvider.OPENAI:
+        if self.provider == LLMProvider.BEDROCK:
+            from bedrock_llm import create_bedrock_llm
+            return create_bedrock_llm(
+                model_id=self.model_name,
+                region_name=self.BEDROCK_REGION,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                request_timeout=self.REQUEST_TIMEOUT_SECONDS,
+            )
+        elif self.provider == LLMProvider.OPENAI:
             from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model=self.model_name,
@@ -112,7 +124,15 @@ class LLMConfig:
     # ============ CẤU HÌNH PROVIDER MẶC ĐỊNH ============
     
     # Provider mặc định (có thể thay đổi bằng biến môi trường)
-    DEFAULT_PROVIDER = LLMProvider.OPENAI
+    DEFAULT_PROVIDER = LLMProvider(settings.rag_llm_provider.value)
+
+    # Bedrock uses the AWS default credential chain, not a provider API key.
+    BEDROCK_REGION = settings.bedrock_region
+    BEDROCK_MODEL = (
+        settings.rag_llm_model
+        if settings.rag_llm_provider == SettingsProvider.BEDROCK
+        else "us.amazon.nova-lite-v1:0"
+    )
     
     # ============ CẤU HÌNH OPENAI ============
     
@@ -218,6 +238,13 @@ class LLMConfig:
                 "device": self.HUGGINGFACE_DEVICE,
                 "requires_api_key": False
             })
+        elif provider == LLMProvider.BEDROCK:
+            config.update({
+                "model": self.model_name,
+                "region": self.BEDROCK_REGION,
+                "requires_api_key": False,
+                "credential_source": "aws_default_chain",
+            })
         
         return config
     
@@ -242,6 +269,9 @@ class LLMConfig:
         
         # Check HuggingFace
         status["huggingface"] = True  # Không cần API key
+
+        # This means no API key is required, not that model access is granted.
+        status["bedrock"] = True
         
         return status
     
@@ -267,6 +297,8 @@ class LLMConfig:
             elif provider == LLMProvider.OLLAMA and api_status["ollama"]:
                 available.append(provider)
             elif provider == LLMProvider.HUGGINGFACE and api_status["huggingface"]:
+                available.append(provider)
+            elif provider == LLMProvider.BEDROCK:
                 available.append(provider)
         
         return available

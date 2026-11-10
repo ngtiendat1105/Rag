@@ -3,11 +3,12 @@
 from enum import Enum
 from pathlib import Path
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class SettingsProvider(str, Enum):
+    BEDROCK = "bedrock"
     OPENAI = "openai"
     GOOGLE_GEMINI = "google_gemini"
     OLLAMA = "ollama"
@@ -26,6 +27,7 @@ class Settings(BaseSettings):
 
     rag_llm_provider: SettingsProvider = SettingsProvider.OPENAI
     rag_llm_model: str = "llama3.2:latest"
+    bedrock_region: str = "us-east-1"
     rag_top_k: int = Field(default=8, gt=0)
     rag_retrieval_top_k: int | None = Field(default=None, gt=0)
     rag_rerank_top_n: int = Field(default=3, gt=0)
@@ -45,7 +47,16 @@ class Settings(BaseSettings):
     rag_reranker_max_length: int = Field(default=512, gt=0)
     rag_use_metadata_filtering: bool = False
 
-    @field_validator("rag_llm_model", "ollama_base_url")
+    @model_validator(mode="before")
+    @classmethod
+    def select_provider_model_default(cls, values):
+        if isinstance(values, dict) and "rag_llm_model" not in values:
+            provider = values.get("rag_llm_provider")
+            if provider in ("bedrock", SettingsProvider.BEDROCK):
+                values = {**values, "rag_llm_model": "us.amazon.nova-lite-v1:0"}
+        return values
+
+    @field_validator("rag_llm_model", "ollama_base_url", "bedrock_region")
     @classmethod
     def require_non_empty(cls, value: str) -> str:
         value = value.strip()

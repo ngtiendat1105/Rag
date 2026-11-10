@@ -20,6 +20,7 @@ try:
     from langchain_core.retrievers import BaseRetriever
     from qdrant_client import QdrantClient
     from qdrant_client.http import models
+    from qdrant_client.http.exceptions import UnexpectedResponse
     LANGCHAIN_AVAILABLE = True
 except ImportError as e:
     LANGCHAIN_AVAILABLE = False
@@ -55,6 +56,20 @@ logger = logging.getLogger(__name__)
 
 class RetrievalError(RuntimeError):
     """Lỗi hạ tầng hoặc cấu hình trong quá trình retrieval."""
+
+
+def _missing_source_file_index(exc: Exception) -> bool:
+    """Only the optional source-file hint may degrade to semantic retrieval."""
+    if not isinstance(exc, UnexpectedResponse) or exc.status_code != 400:
+        return False
+    try:
+        error = exc.structured()["status"]["error"]
+    except (KeyError, TypeError, ValueError):
+        return False
+    return (
+        isinstance(error, str)
+        and 'Index required but not found for "metadata.source_file"' in error
+    )
 
 
 class LegalRetrieverService:
@@ -288,12 +303,13 @@ class LegalRetrieverService:
                     )
                 )
             elif key == "weight":
-                # Đảm bảo giá trị là số nguyên (float không được hỗ trợ trong MatchValue)
-                int_value = int(value) if isinstance(value, (int, float)) else 1
+                # Exact numeric range supports existing INTEGER or FLOAT indexes
+                # and preserves fractional weights rather than truncating them.
+                numeric_value = float(value)
                 filter_list.append(
                     models.FieldCondition(
                         key="metadata.weight",
-                        match=models.MatchValue(value=int_value)
+                        range=models.Range(gte=numeric_value, lte=numeric_value)
                     )
                 )
             elif key == "effective_date":
@@ -344,6 +360,8 @@ class LegalRetrieverService:
             # colloquial, or acronym-based Vietnamese questions.
             for variant in variants:
                 query_embedding = self.embedder.embed_text(variant)
+                # Configured filters are mandatory: never remove them when a
+                # service or index fails, or unverified/unauthorized data may leak.
                 search_result = self.qdrant_client.query_points(
                     collection_name=COLLECTION_NAME,
                     query=query_embedding.tolist(),
@@ -375,16 +393,30 @@ class LegalRetrieverService:
                 scoped_filter = models.Filter(
                     must=scoped_conditions
                 )
-                scoped_result = self.qdrant_client.query_points(
-                    collection_name=COLLECTION_NAME,
-                    query=query_embedding.tolist(),
-                    query_filter=scoped_filter,
-                    limit=candidate_limit,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-                for hit in scoped_result.points:
-                    hits_by_id[str(hit.id)] = hit
+                try:
+                    scoped_result = self.qdrant_client.query_points(
+                        collection_name=COLLECTION_NAME,
+                        query=query_embedding.tolist(),
+                        query_filter=scoped_filter,
+                        limit=candidate_limit,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+                except Exception as exc:
+                    # Qdrant requires a payload index for filtered fields. Older
+                    # collections may not have metadata.source_file indexed yet;
+                    # keep the semantic results instead of failing the whole chat.
+                    if not _missing_source_file_index(exc):
+                        raise
+                    logger.warning(
+                        "Skipping source-scoped retrieval for %s: %s",
+                        source_file,
+                        exc,
+                    )
+                    scoped_result = None
+                if scoped_result is not None:
+                    for hit in scoped_result.points:
+                        hits_by_id[str(hit.id)] = hit
             
             # Convert to LangChain Documents
             documents = []
