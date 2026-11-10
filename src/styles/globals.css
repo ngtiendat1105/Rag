@@ -222,7 +222,7 @@ html.dark .chat-professional .markdown-content blockquote {
 }
 
 /* Theme switching lives in the account menu as a compact pill switch. */
-.chat-professional > .pointer-events-none {
+.chat-professional section > .pointer-events-none {
   display: none;
 }
 
