@@ -1,3 +1,4 @@
+import logging
 import os
 import secrets
 import threading
@@ -19,6 +20,7 @@ if TYPE_CHECKING:
 
 
 app = FastAPI(title="LegalAI RAG API", version="1.0.0")
+logger = logging.getLogger(__name__)
 configured_origins = [
     origin.strip()
     for origin in os.getenv(
@@ -63,13 +65,17 @@ def get_pipeline() -> "RAGPipeline":
         "openai": LLMProvider.OPENAI,
         "google_gemini": LLMProvider.GOOGLE_GEMINI,
         "gemini": LLMProvider.GOOGLE_GEMINI,
+        "bedrock": LLMProvider.BEDROCK,
     }
     provider = providers.get(provider_name)
     if provider is None:
         raise ValueError(f"RAG_LLM_PROVIDER không hợp lệ: {provider_name}")
     return create_rag_pipeline(
         provider=provider,
-        model_name=os.getenv("RAG_LLM_MODEL") or os.getenv("OLLAMA_MODEL", "llama3.2:3b"),
+        model_name=(
+            os.getenv("RAG_LLM_MODEL")
+            or (os.getenv("OLLAMA_MODEL", "llama3.2:3b") if provider == LLMProvider.OLLAMA else None)
+        ),
     )
 
 
@@ -120,10 +126,13 @@ def chat(
     try:
         result = get_pipeline().query(question)
     except RetrievalError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        logger.exception("RAG retrieval failed")
+        raise HTTPException(status_code=503, detail="Không thể truy vấn kho tài liệu. Vui lòng thử lại sau.") from exc
     except Exception as exc:
+        logger.exception("RAG pipeline initialization or generation failed")
         raise HTTPException(status_code=502, detail="LLM không thể xử lý yêu cầu") from exc
 
     if "error" in result:
-        raise HTTPException(status_code=502, detail=result["error"])
+        logger.error("RAG generation failed: %s", result["error"])
+        raise HTTPException(status_code=502, detail="Dịch vụ AI không thể xử lý yêu cầu. Vui lòng thử lại sau.")
     return result

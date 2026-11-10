@@ -52,7 +52,7 @@ class LegalRetriever:
         self.embedder = embedder or create_vietnamese_embedder()
         
         # Khởi tạo vector DB manager
-        self.db_manager = db_manager or create_vector_db_manager(local_mode=True)
+        self.db_manager = db_manager or create_vector_db_manager()
         
         # Kiểm tra collection tồn tại
         self._check_collection_exists()

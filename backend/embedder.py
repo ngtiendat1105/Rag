@@ -3,6 +3,7 @@ embedder.py - Class VietnameseEmbedder sử dụng sentence-transformers cho ti�
 Xử lý embedding văn bản tiếng Việt với model tối ưu hóa
 """
 
+import os
 import time
 from typing import List, Optional, Union
 import numpy as np
@@ -72,14 +73,14 @@ class VietnameseEmbedder:
             
             # Tải model với các tham số tối ưu
             self.model = SentenceTransformer(
-                self.model_name,
+                os.getenv("EMBEDDING_MODEL_PATH") or self.model_name,
                 device=self.device,
-                trust_remote_code=True  # Quan trọng cho một số model custom
+                local_files_only=bool(os.getenv("EMBEDDING_MODEL_PATH")),
+                trust_remote_code=False,
             )
             
             # Kiểm tra embedding dimension thực tế
-            test_embedding = self.model.encode(["test"], convert_to_numpy=True)
-            actual_dimension = test_embedding.shape[1]
+            actual_dimension = self.model.get_sentence_embedding_dimension()
             
             if actual_dimension != self.embedding_dimension:
                 print(f"⚠️ Dimension mismatch: config={self.embedding_dimension}, actual={actual_dimension}")

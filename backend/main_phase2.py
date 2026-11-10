@@ -63,7 +63,7 @@ class Phase2Pipeline:
                 self.embedder = create_vietnamese_embedder()
             
             # Tạo vector DB manager
-            self.db_manager = create_vector_db_manager(local_mode=True)
+            self.db_manager = create_vector_db_manager()
             
             # Tạo indexer
             self.indexer = create_data_indexer(
