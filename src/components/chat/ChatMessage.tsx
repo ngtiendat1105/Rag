@@ -121,15 +121,6 @@ export default function ChatMessage({
             className={`relative rounded-2xl p-4 border ${getMessageBg()} ${getMessageBorder()}
               ${isUser ? 'rounded-br-sm' : 'rounded-bl-sm'} max-w-3xl`}
           >
-            {/* Status indicators */}
-            {status === 'sending' && (
-              <div className="absolute -top-2 -right-2 flex items-center gap-1">
-                <div className="w-2 h-2 bg-primary-400 rounded-full animate-pulse" />
-                <div className="w-2 h-2 bg-primary-400 rounded-full animate-pulse delay-150" />
-                <div className="w-2 h-2 bg-primary-400 rounded-full animate-pulse delay-300" />
-              </div>
-            )}
-
             {status === 'error' && (
               <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
                 Lỗi
@@ -152,8 +143,8 @@ export default function ChatMessage({
             )}
 
             {isAI && typeof confidence === 'number' && (
-              <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs ${confidence >= 75 ? 'bg-green-500/10 text-green-300' : 'bg-yellow-500/10 text-yellow-200'}`}>
-                <span className={`h-2 w-2 rounded-full ${confidence >= 75 ? 'bg-green-400' : 'bg-yellow-300'}`} />
+              <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${confidence >= 75 ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-100'}`}>
+                <span className={`h-2 w-2 rounded-full ${confidence >= 75 ? 'bg-emerald-600 dark:bg-emerald-300' : 'bg-amber-600 dark:bg-amber-300'}`} />
                 Độ tin cậy {confidence}%{confidence < 75 && ' — nên kiểm tra lại nguồn trước khi sử dụng.'}
               </div>
             )}
@@ -163,7 +154,7 @@ export default function ChatMessage({
               <div className="mt-4 pt-4">
                 <button
                   onClick={() => setShowReferences(!showReferences)}
-                  className="flex items-center gap-2 text-sm text-gray-300 hover:text-white transition-colors"
+                  className="flex items-center gap-2 rounded-lg bg-[#0b82d1] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0869aa]"
                 >
                   <FileText className="w-4 h-4" />
                   {showReferences ? 'Ẩn tài liệu tham khảo' : `Hiển thị ${references.length} tài liệu tham khảo`}
