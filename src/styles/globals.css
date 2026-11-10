@@ -23,6 +23,21 @@ body {
   font-family: 'Inter', sans-serif;
 }
 
+html,
+body,
+body > div,
+.chat-professional,
+.chat-professional * {
+  transition-property: background-color, border-color, color, box-shadow;
+  transition-duration: 220ms;
+  transition-timing-function: ease;
+}
+
+html:not(.dark) body {
+  color: #0f172a;
+  background: #f5f7fa;
+}
+
 body {
   color: rgb(var(--foreground-rgb));
   background: linear-gradient(
@@ -139,6 +154,125 @@ body {
 
 .chat-professional .markdown-content a {
   color: #173f73;
+}
+
+/* Keep the professional chat readable when the application dark theme is active. */
+html.dark .chat-professional {
+  background: #080d1d !important;
+  color: #e5edf8;
+}
+
+html.dark .chat-professional header,
+html.dark .chat-professional > section > div.border-b,
+html.dark .chat-professional > section > div.border-t {
+  background-color: #111a2c !important;
+  border: none !important;
+}
+
+html.dark .chat-professional aside {
+  background-color: #111a2c !important;
+  border-color: #2b3a53 !important;
+  color: #e5edf8;
+}
+
+html.dark .chat-professional aside input,
+html.dark .chat-professional aside button:hover {
+  background-color: #1b2940 !important;
+}
+
+html.dark .chat-professional div:has(> textarea) {
+  background-color: #111a2c !important;
+  border-color: #3a4c68 !important;
+}
+
+html.dark .chat-professional h1,
+html.dark .chat-professional h2,
+html.dark .chat-professional h3 {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional textarea,
+html.dark .chat-professional input {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional textarea::placeholder,
+html.dark .chat-professional input::placeholder {
+  color: #94a9c4;
+}
+
+html.dark .chat-professional .markdown-content {
+  color: #e6edf7;
+}
+
+html.dark .chat-professional .markdown-content h1,
+html.dark .chat-professional .markdown-content h2,
+html.dark .chat-professional .markdown-content h3 {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional .markdown-content code,
+html.dark .chat-professional .markdown-content pre {
+  background: #1b2940;
+  color: #d9e8ff;
+}
+
+html.dark .chat-professional .markdown-content blockquote {
+  color: #c7d4e7;
+}
+
+/* Theme switching lives in the account menu as a compact pill switch. */
+.chat-professional section > .pointer-events-none {
+  display: none;
+}
+
+.chat-professional .absolute.right-0.top-12 > button:first-child {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: 42px;
+  padding-right: 52px;
+  font-size: 0;
+}
+
+.chat-professional .absolute.right-0.top-12 > button:first-child::before {
+  content: 'Giao diện';
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.chat-professional .absolute.right-0.top-12 > button:first-child::after {
+  content: '';
+  position: absolute;
+  right: 8px;
+  top: 10px;
+  width: 38px;
+  height: 22px;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: inset 0 0 0 2px rgba(255,255,255,.18);
+}
+
+.chat-professional .absolute.right-0.top-12 > button:first-child svg {
+  position: absolute;
+  z-index: 1;
+  right: 11px;
+  top: 13px;
+  width: 16px;
+  height: 16px;
+  color: #fff;
+}
+
+html:not(.dark) .chat-professional .absolute.right-0.top-12 > button:first-child::after {
+  background: #cbd5e1;
+}
+
+html:not(.dark) .chat-professional .absolute.right-0.top-12 > button:first-child svg {
+  left: auto;
+  right: 27px;
+  color: #475569;
 }
 
 /* Text selection */

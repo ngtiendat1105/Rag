@@ -2,10 +2,6 @@ fastapi
 mangum
 numpy
 qdrant-client
-# Lambda runs CPU-only; use the CPU wheel instead of pulling CUDA runtimes.
---extra-index-url https://download.pytorch.org/whl/cpu
-torch==2.15.0+cpu
-sentence-transformers
 langchain-core
 langchain-qdrant
 boto3>=1.34.131,<2

@@ -28,6 +28,10 @@ class Settings(BaseSettings):
     rag_llm_provider: SettingsProvider = SettingsProvider.OPENAI
     rag_llm_model: str = "llama3.2:latest"
     bedrock_region: str = "us-east-1"
+    rag_embedding_provider: str = "local"
+    rag_embedding_model: str = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+    rag_embedding_dimension: int = Field(default=768, gt=0)
+    qdrant_collection: str = "legal_knowledge_base"
     rag_top_k: int = Field(default=8, gt=0)
     rag_retrieval_top_k: int | None = Field(default=None, gt=0)
     rag_rerank_top_n: int = Field(default=3, gt=0)

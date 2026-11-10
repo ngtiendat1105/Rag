@@ -13,7 +13,6 @@ export default function ChatInput({ onSendMessage, placeholder = 'Nhập câu h�
   const [attachments, setAttachments] = useState<ChatAttachment[]>([])
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const suggestions = ['Quy định nghỉ phép năm', 'Thời gian thử việc tối đa', 'Chế độ bảo hiểm xã hội']
 
   const submit = async () => {
     const value = message.trim()
@@ -33,7 +32,6 @@ export default function ChatInput({ onSendMessage, placeholder = 'Nhập câu h�
   }
 
   return <div>
-    <div className="mb-3 flex gap-2 overflow-x-auto pb-1">{suggestions.map(item => <button key={item} onClick={() => { setMessage(item); textareaRef.current?.focus() }} className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 transition hover:border-[#173f73]/30 hover:bg-[#f3f7fb] hover:text-[#173f73]">{item}</button>)}</div>
     <div className="rounded-2xl border border-slate-300 bg-white shadow-[0_8px_30px_rgba(15,23,42,0.06)] transition focus-within:border-[#173f73]/50 focus-within:ring-4 focus-within:ring-[#173f73]/5">
       {attachments.length > 0 && <div className="flex flex-wrap gap-2 border-b border-slate-100 px-4 py-3">{attachments.map(file => <span key={file.id} className="flex max-w-full items-center gap-2 rounded-lg bg-slate-100 px-2.5 py-1.5 text-xs text-slate-600"><FileText className="h-3.5 w-3.5" /><span className="max-w-40 truncate">{file.name}</span><button onClick={() => setAttachments(current => current.filter(item => item.id !== file.id))} aria-label={`Bỏ tệp ${file.name}`}><X className="h-3.5 w-3.5" /></button></span>)}</div>}
       <textarea ref={textareaRef} value={message} maxLength={2000} rows={1} disabled={disabled || isLoading || isSubmitting} placeholder={placeholder} onKeyDown={handleKeyDown} onChange={event => { setMessage(event.target.value); setError(''); event.target.style.height = 'auto'; event.target.style.height = `${Math.min(event.target.scrollHeight, 140)}px` }} className="min-h-[64px] max-h-[140px] w-full resize-none bg-transparent px-4 pb-2 pt-4 text-[15px] leading-6 text-slate-800 outline-none placeholder:text-slate-400 disabled:opacity-50" />

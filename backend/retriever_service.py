@@ -46,10 +46,7 @@ from embedder import create_vietnamese_embedder, VietnameseEmbedder
 from metadata_utils import normalize_metadata
 from query_understanding import fold_text, understand_query
 
-try:
-    from sentence_transformers import CrossEncoder
-except ImportError:
-    CrossEncoder = None
+CrossEncoder = None
 
 logger = logging.getLogger(__name__)
 

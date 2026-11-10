@@ -26,7 +26,7 @@ else:
 VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
 
 # Qdrant collection name
-COLLECTION_NAME = "legal_knowledge_base"
+COLLECTION_NAME = settings.qdrant_collection
 
 # ============ CẤU HÌNH MODEL EMBEDDING ============
 
@@ -35,11 +35,11 @@ COLLECTION_NAME = "legal_knowledge_base"
 # 1. "bkai-foundation-models/vietnamese-bi-encoder" - Model của BKAI
 # 2. "KeepitIreal/Vietnamese-sbert" - Model Sentence-BERT cho tiếng Việt
 # 3. "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" - Multilingual
-VIETNAMESE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+VIETNAMESE_EMBEDDING_MODEL = settings.rag_embedding_model
 
 # Kích thước vector embedding (phụ thuộc vào model)
 # KeepitIreal/Vietnamese-sbert: 768 dimensions
-EMBEDDING_DIMENSION = 768
+EMBEDDING_DIMENSION = settings.rag_embedding_dimension
 
 # Device cho inference (cuda nếu có GPU, cpu nếu không)
 EMBEDDING_DEVICE = "cpu"  # Có thể đổi thành "cuda" nếu có GPU
