@@ -67,18 +67,18 @@ export default function ChatMessage({
 
   const getMessageBg = () => {
     if (isUser) return 'bg-[#173f73] text-white shadow-sm'
-    if (isAI) return 'bg-white text-slate-700 shadow-sm'
-    if (isSystem) return 'bg-amber-50 text-slate-700'
-    if (isError) return 'bg-red-50 text-red-800'
-    return 'bg-white text-slate-700'
+    if (isError) return 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-100'
+    if (isAI) return 'bg-white text-slate-700 shadow-sm dark:bg-dark-surface dark:text-slate-100'
+    if (isSystem) return 'bg-amber-50 text-slate-700 dark:bg-amber-950/50 dark:text-amber-100'
+    return 'bg-white text-slate-700 dark:bg-dark-surface dark:text-slate-100'
   }
 
   const getMessageBorder = () => {
     if (isUser) return 'border-[#173f73]'
-    if (isAI) return 'border-slate-200'
-    if (isSystem) return 'border-amber-200'
-    if (isError) return 'border-red-200'
-    return 'border-slate-200'
+    if (isAI) return 'border-slate-200 dark:border-dark-border'
+    if (isSystem) return 'border-amber-200 dark:border-amber-800'
+    if (isError) return 'border-red-200 dark:border-red-800'
+    return 'border-slate-200 dark:border-dark-border'
   }
 
   const getIcon = () => {
@@ -106,10 +106,10 @@ export default function ChatMessage({
       {/* Message Content */}
       <div className={`flex-1 ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`${isUser ? 'text-right' : 'text-left'} mb-1`}>
-          <span className="font-semibold text-sm">
+          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
             {isUser ? 'Bạn' : isAI ? 'Legal AI Assistant' : 'Hệ thống'}
           </span>
-          <span className="text-xs text-slate-400 ml-2">
+          <span className="text-xs text-slate-400 dark:text-slate-300 ml-2">
             {formatDate(timestamp)}
             {status === 'sending' && ' • Đang gửi...'}
             {status === 'error' && ' • Lỗi'}

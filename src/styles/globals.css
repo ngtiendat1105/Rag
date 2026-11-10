@@ -141,6 +141,76 @@ body {
   color: #173f73;
 }
 
+/* Keep the professional chat readable when the application dark theme is active. */
+html.dark .chat-professional {
+  background: #080d1d !important;
+  color: #e5edf8;
+}
+
+html.dark .chat-professional header,
+html.dark .chat-professional > section > div.border-b,
+html.dark .chat-professional > section > div.border-t {
+  background-color: #111a2c !important;
+  border-color: #2b3a53 !important;
+}
+
+html.dark .chat-professional aside {
+  background-color: #111a2c !important;
+  border-color: #2b3a53 !important;
+  color: #e5edf8;
+}
+
+html.dark .chat-professional aside input,
+html.dark .chat-professional aside button:hover {
+  background-color: #1b2940 !important;
+}
+
+html.dark .chat-professional div:has(> textarea) {
+  background-color: #111a2c !important;
+  border-color: #3a4c68 !important;
+}
+
+html.dark .chat-professional h1,
+html.dark .chat-professional h2,
+html.dark .chat-professional h3 {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional p,
+html.dark .chat-professional span {
+  color: #c7d4e7;
+}
+
+html.dark .chat-professional textarea,
+html.dark .chat-professional input {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional textarea::placeholder,
+html.dark .chat-professional input::placeholder {
+  color: #94a9c4;
+}
+
+html.dark .chat-professional .markdown-content {
+  color: #e6edf7;
+}
+
+html.dark .chat-professional .markdown-content h1,
+html.dark .chat-professional .markdown-content h2,
+html.dark .chat-professional .markdown-content h3 {
+  color: #f8fafc;
+}
+
+html.dark .chat-professional .markdown-content code,
+html.dark .chat-professional .markdown-content pre {
+  background: #1b2940;
+  color: #d9e8ff;
+}
+
+html.dark .chat-professional .markdown-content blockquote {
+  color: #c7d4e7;
+}
+
 /* Text selection */
 ::selection {
   @apply bg-primary-500/30 text-white;
