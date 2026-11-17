@@ -24,6 +24,8 @@ test_path/
 # Next.js / Node.js
 node_modules/
 .next/
+.next-dev/
+.next-build/
 out/
 coverage/
 build/

@@ -76,13 +76,19 @@ class LLMConfig:
             )
         elif self.provider == LLMProvider.OLLAMA:
             from langchain_ollama import ChatOllama
+            ollama_options = {
+                "model": self.model_name,
+                "temperature": self.temperature,
+                "base_url": self.OLLAMA_BASE_URL,
+                "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096")),
+                "num_predict": self.max_tokens,
+                "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
+            }
+            num_thread = os.getenv("OLLAMA_NUM_THREAD", "").strip()
+            if num_thread.isdigit() and int(num_thread) > 0:
+                ollama_options["num_thread"] = int(num_thread)
             return ChatOllama(
-                model=self.model_name,
-                temperature=self.temperature,
-                base_url=self.OLLAMA_BASE_URL,
-                num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "4096")),
-                num_predict=self.max_tokens,
-                keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
+                **ollama_options,
             )
         elif self.provider == LLMProvider.HUGGINGFACE:
             raise NotImplementedError("HuggingFace models are currently not supported. Please use OpenAI, Google Gemini, or Ollama instead.")
@@ -131,7 +137,7 @@ class LLMConfig:
     # ============ CẤU HÌNH OLLAMA ============
     
     # Model Ollama local (các model hỗ trợ tiếng Việt)
-    OLLAMA_MODEL = "llama3.2:3b"  # Hoặc "mistral", "qwen2.5"
+    OLLAMA_MODEL = "llama3.2:latest"  # Hoặc "mistral:latest", "llama3.1:latest"
     
     # Base URL Ollama (mặc định localhost:11434)
     OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
@@ -191,29 +197,29 @@ class LLMConfig:
         
         if provider == LLMProvider.OPENAI:
             config.update({
-                "model": cls.OPENAI_MODEL,
-                "api_key": cls.OPENAI_API_KEY,
-                "requires_api_key": bool(cls.OPENAI_API_KEY)
+                "model": self.OPENAI_MODEL,
+                "api_key": self.OPENAI_API_KEY,
+                "requires_api_key": bool(self.OPENAI_API_KEY)
             })
         
         elif provider == LLMProvider.GOOGLE_GEMINI:
             config.update({
-                "model": cls.GEMINI_MODEL,
-                "api_key": cls.GOOGLE_API_KEY,
-                "requires_api_key": bool(cls.GOOGLE_API_KEY)
+                "model": self.GEMINI_MODEL,
+                "api_key": self.GOOGLE_API_KEY,
+                "requires_api_key": bool(self.GOOGLE_API_KEY)
             })
         
         elif provider == LLMProvider.OLLAMA:
             config.update({
-                "model": cls.OLLAMA_MODEL,
-                "base_url": cls.OLLAMA_BASE_URL,
+                "model": self.OLLAMA_MODEL,
+                "base_url": self.OLLAMA_BASE_URL,
                 "requires_api_key": False
             })
         
         elif provider == LLMProvider.HUGGINGFACE:
             config.update({
-                "model": cls.HUGGINGFACE_MODEL,
-                "device": cls.HUGGINGFACE_DEVICE,
+                "model": self.HUGGINGFACE_MODEL,
+                "device": self.HUGGINGFACE_DEVICE,
                 "requires_api_key": False
             })
         

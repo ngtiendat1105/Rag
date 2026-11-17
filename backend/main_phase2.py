@@ -4,6 +4,7 @@ Thực thi quá trình tạo DB và test truy vấn mẫu
 """
 
 import sys
+import sys
 import time
 import argparse
 from pathlib import Path
@@ -15,6 +16,11 @@ from config_phase2 import (
     VIETNAMESE_EMBEDDING_MODEL,
     VERBOSE_LOGGING
 )
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 from embedder import create_vietnamese_embedder, VietnameseEmbedder
 from vector_db_manager import create_vector_db_manager, VectorDBManager
 from indexer import create_data_indexer, DataIndexer

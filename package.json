@@ -4,9 +4,9 @@
   "private": true,
   "description": "Web Chatbot Pháp Lý Nội Bộ Doanh Nghiệp với UI/UX hiện đại và RAG integration",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "node scripts/run-next.js dev",
+    "build": "node scripts/run-next.js build",
+    "start": "node scripts/run-next.js start",
     "lint": "next lint",
     "rag:api": "python -m uvicorn --app-dir backend api:app --host 127.0.0.1 --port 8000",
     "rag:sync": "python backend/sync_documents.py",

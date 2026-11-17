@@ -1,8 +1,11 @@
 import { create } from 'zustand'
+import { persist } from 'zustand/middleware'
 import { SAMPLE_CHATS, DEMO_MESSAGES } from '@/utils/constants'
 import { generateChatId } from '@/utils/formatters'
 import { ContentModerationError, moderateChatContent } from '@/utils/contentModeration'
 import { ragChatService } from '@/services/ragChatService'
+
+let activeRequestController: AbortController | null = null
 
 export interface ChatAttachment {
   id: string
@@ -13,8 +16,10 @@ export interface ChatAttachment {
 
 export interface ChatReference {
   title: string
+  documentId?: string
   page?: number
   excerpt?: string
+  previewUrl?: string
 }
 
 interface Message {
@@ -27,6 +32,8 @@ interface Message {
   confidence?: number
   attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
+  feedbackReason?: string
+  suggestions?: string[]
 }
 
 interface Chat {
@@ -49,15 +56,18 @@ interface ChatState {
   // Actions
   setActiveChat: (chatId: string) => void
   createNewChat: (title?: string) => Chat
-  sendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>
+  sendMessage: (content: string, attachments?: ChatAttachment[], files?: File[]) => Promise<void>
+  cancelMessage: () => void
   deleteChat: (chatId: string) => void
+  retryMessage: (messageId: string) => Promise<void>
   archiveChat: (chatId: string) => void
-  rateMessage: (messageId: string, rating: 'like' | 'dislike') => void
+  unarchiveChat: (chatId: string) => void
+  rateMessage: (messageId: string, rating: 'like' | 'dislike', reason: string, content: string, detail?: string) => Promise<void>
   clearChat: (chatId: string) => void
   searchChats: (query: string) => Chat[]
 }
 
-export const useChatStore = create<ChatState>((set, get) => ({
+export const useChatStore = create<ChatState>()(persist((set, get) => ({
   chats: SAMPLE_CHATS.map(chat => ({
     ...chat,
     messages: chat.id === 'chat_1' ? DEMO_MESSAGES : [],
@@ -73,9 +83,12 @@ export const useChatStore = create<ChatState>((set, get) => ({
   },
 
   createNewChat: (title?: string) => {
+    const safeTitle = typeof title === 'string' && title.trim()
+      ? title.trim()
+      : 'Cuộc trò chuyện mới'
     const newChat: Chat = {
       id: generateChatId(),
-      title: title || 'Cuộc trò chuyện mới',
+      title: safeTitle,
       lastMessage: '',
       timestamp: new Date().toISOString(),
       unread: false,
@@ -91,7 +104,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return newChat
   },
 
-  sendMessage: async (content: string, attachments = []) => {
+  sendMessage: async (content: string, attachments = [], files = []) => {
     const { activeChatId, chats } = get()
     if (!activeChatId || !content.trim()) return
 
@@ -125,9 +138,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
       processingStage: attachments.length ? 'Đang đọc tài liệu đính kèm...' : 'Đang tìm tài liệu liên quan...',
     }))
 
+    activeRequestController?.abort()
+    const requestController = new AbortController()
+    activeRequestController = requestController
+
     try {
       set({ processingStage: 'Đang truy xuất và tổng hợp từ kho tài liệu...' })
-      const ragResponse = await ragChatService.sendQueryToRAG(content)
+      const ragResponse = await ragChatService.sendQueryToRAG(content, undefined, { signal: requestController.signal, files })
       const aiResponse: Message = {
         id: ragResponse.id,
         role: 'assistant',
@@ -137,6 +154,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
         timestamp: ragResponse.timestamp,
         references: ragResponse.references,
         confidence: ragResponse.confidence,
+        suggestions: ragResponse.suggestedQuestions,
       }
       set(state => ({
         chats: state.chats.map(chat => chat.id === activeChatId ? {
@@ -147,6 +165,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
         processingStage: '',
       }))
     } catch (error) {
+      if (requestController.signal.aborted) {
+        set(state => ({
+          chats: state.chats.map(chat => chat.id === activeChatId ? {
+            ...chat,
+            messages: chat.messages.map(msg => msg.id === userMessage.id ? { ...msg, status: 'sent' as const } : msg),
+          } : chat),
+          isTyping: false,
+          processingStage: '',
+        }))
+        return
+      }
       const message = error instanceof Error ? error.message : 'Không thể xử lý câu hỏi.'
       const errorResponse: Message = {
         id: `msg_${Date.now()}_error`,
@@ -163,7 +192,13 @@ export const useChatStore = create<ChatState>((set, get) => ({
         isTyping: false,
         processingStage: '',
       }))
+    } finally {
+      if (activeRequestController === requestController) activeRequestController = null
     }
+  },
+
+  cancelMessage: () => {
+    activeRequestController?.abort()
   },
 
   deleteChat: (chatId: string) => {
@@ -171,6 +206,19 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chats: state.chats.filter(chat => chat.id !== chatId),
       activeChatId: state.activeChatId === chatId ? null : state.activeChatId,
     }))
+  },
+
+  retryMessage: async (messageId: string) => {
+    const { activeChatId, chats } = get()
+    const chat = chats.find(item => item.id === activeChatId)
+    if (!chat) return
+    const failedIndex = chat.messages.findIndex(message => message.id === messageId)
+    const previous = failedIndex > 0 ? chat.messages[failedIndex - 1] : undefined
+    if (!previous || previous.role !== 'user') return
+    set(state => ({
+      chats: state.chats.map(item => item.id === activeChatId ? { ...item, messages: item.messages.filter(message => message.id !== messageId) } : item),
+    }))
+    await get().sendMessage(previous.content, previous.attachments)
   },
 
   archiveChat: (chatId: string) => {
@@ -183,7 +231,17 @@ export const useChatStore = create<ChatState>((set, get) => ({
     }))
   },
 
-  rateMessage: (messageId: string, rating: 'like' | 'dislike') => {
+  unarchiveChat: (chatId: string) => {
+    set(state => ({
+      chats: state.chats.map(chat =>
+        chat.id === chatId
+          ? { ...chat, status: 'active' }
+          : chat
+      ),
+    }))
+  },
+
+  rateMessage: async (messageId: string, rating: 'like' | 'dislike', reason: string, content: string, detail = '') => {
     const { activeChatId } = get()
     if (!activeChatId) return
 
@@ -194,13 +252,22 @@ export const useChatStore = create<ChatState>((set, get) => ({
               ...chat,
               messages: chat.messages.map(msg =>
                 msg.id === messageId
-                  ? { ...msg, rating }
+                  ? { ...msg, rating, feedbackReason: reason }
                   : msg
               ),
             }
           : chat
       ),
     }))
+    const response = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, rating, reason, detail, messageContent: content }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({})) as { message?: string }
+      throw new Error(data.message || 'Không thể gửi feedback đến quản trị viên.')
+    }
   },
 
   clearChat: (chatId: string) => {
@@ -222,4 +289,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
       chat.lastMessage.toLowerCase().includes(lowercaseQuery)
     )
   },
+}), {
+  name: 'legal-ai-chat-history',
+  partialize: state => ({ chats: state.chats, activeChatId: state.activeChatId }),
 }))

@@ -124,14 +124,14 @@ export default function AdminDashboard() {
               { service: 'Real-time Chat', status: 'online', latency: '85ms', color: 'text-green-400' },
               { service: 'Analytics Engine', status: 'maintenance', latency: 'N/A', color: 'text-yellow-400' },
             ].map((service, index) => (
-              <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-dark-surface/50">
+              <div key={index} className="flex items-center justify-between gap-4 rounded-xl bg-dark-surface/50 p-4">
                 <div>
-                  <div className="font-medium">{service.service}</div>
+                  <div className="text-sm font-medium">{service.service}</div>
                   <div className="text-sm text-gray-400">{service.latency}</div>
                 </div>
                 <div className={`flex items-center gap-2 ${service.color}`}>
                   <div className={`w-2 h-2 rounded-full ${service.status === 'online' ? 'bg-green-400' : 'bg-yellow-400'}`} />
-                  <span className="text-sm font-medium">
+                  <span className="text-sm font-medium whitespace-nowrap">
                     {service.status === 'online' ? 'Online' : 'Maintenance'}
                   </span>
                 </div>

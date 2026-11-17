@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { motion } from 'framer-motion'
-import { Mail, Lock, Eye, EyeOff, Building, User } from 'lucide-react'
+import { Mail, Lock, Eye, EyeOff, User } from 'lucide-react'
 import Input from '@/components/ui/Input'
 import Button from '@/components/ui/Button'
 import { useRouter } from 'next/navigation'
@@ -17,7 +17,6 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
-    department: '',
   })
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -32,7 +31,6 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
     const newErrors: Record<string, string> = {}
     if (!formData.email) newErrors.email = 'Vui lòng nhập email'
     if (!formData.password) newErrors.password = 'Vui lòng nhập mật khẩu'
-    if (!formData.department) newErrors.department = 'Vui lòng chọn phòng ban'
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors)
@@ -61,15 +59,6 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
     }
   }
 
-  const departments = [
-    'Phòng Pháp chế',
-    'Phòng Nhân sự',
-    'Phòng Kế toán',
-    'Phòng Kinh doanh',
-    'Ban Giám đốc',
-    'IT Department',
-  ]
-
   return (
     <motion.form
       initial={{ opacity: 0, y: 20 }}
@@ -79,7 +68,7 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
       className="space-y-6"
     >
       <div className="text-center mb-8">
-        <h2 className="text-3xl font-bold gradient-text mb-2">
+        <h2 className="mb-2 text-3xl font-bold text-primary-300">
           Đăng nhập hệ thống
         </h2>
         <p className="text-gray-300">
@@ -95,6 +84,7 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         onChange={(e) => handleChange('email', e.target.value)}
         error={errors.email}
         icon={<Mail className="w-5 h-5" />}
+        className="border border-dark-border bg-dark-surface text-gray-100"
         required
       />
 
@@ -115,37 +105,9 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
             {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
           </button>
         }
+        className="border border-dark-border bg-dark-surface text-gray-100"
         required
       />
-
-      <div className="space-y-2">
-        <label className="block text-sm font-medium text-gray-300">
-          Phòng ban
-        </label>
-        <select
-          value={formData.department}
-          onChange={(e) => handleChange('department', e.target.value)}
-          className={`
-            w-full glass-effect-light rounded-xl px-4 py-3 text-white
-            focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent
-            transition-all duration-300 appearance-none
-            ${errors.department ? 'border-red-500 focus:ring-red-500' : ''}
-          `}
-          required
-        >
-          <option value="" className="bg-dark-surface">
-            Chọn phòng ban
-          </option>
-          {departments.map((dept) => (
-            <option key={dept} value={dept} className="bg-dark-surface">
-              {dept}
-            </option>
-          ))}
-        </select>
-        {errors.department && (
-          <p className="text-sm text-red-400">{errors.department}</p>
-        )}
-      </div>
 
       <div className="flex items-center justify-between">
         <label className="flex items-center space-x-2 cursor-pointer">
@@ -172,13 +134,13 @@ export default function LoginForm({ onLoginSuccess, onShowOTP }: LoginFormProps)
         variant="primary"
         size="lg"
         loading={loading}
-        className="w-full"
+        className="w-full !bg-primary-500 !text-white shadow-lg shadow-primary-500/20 hover:!bg-primary-600"
         icon={<User className="w-5 h-5" />}
       >
         {loading ? 'Đang xác thực...' : 'Đăng nhập'}
       </Button>
 
-      <div className="text-center pt-6 border-t border-dark-border">
+      <div className="mt-6 border-t border-dark-border pt-8 text-center">
         <p className="text-gray-400 text-sm">
           Hệ thống chỉ dành cho nhân viên công ty. 
           Liên hệ IT Support nếu có vấn đề đăng nhập.

@@ -6,6 +6,8 @@ Kết nối với Vector Database từ Giai đoạn 2 và cung cấp retrieval c
 import os
 import re
 import sys
+import time
+from collections import OrderedDict
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
@@ -13,7 +15,7 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 try:
-    from langchain_qdrant import Qdrant
+    from langchain_qdrant import QdrantVectorStore
     from langchain_core.documents import Document
     from langchain_core.retrievers import BaseRetriever
     from qdrant_client import QdrantClient
@@ -21,6 +23,7 @@ try:
     LANGCHAIN_AVAILABLE = True
 except ImportError as e:
     LANGCHAIN_AVAILABLE = False
+    QdrantVectorStore = None
     print(f"⚠️ Warning: LangChain or Qdrant client not installed: {e}")
     # Define fallback classes
     class Document:
@@ -93,6 +96,19 @@ class LegalRetrieverService:
             if similarity_threshold is not None 
             else LLMConfig.SIMILARITY_THRESHOLD
         )
+        self.rerank_top_n = max(
+            int(os.getenv("RAG_RERANK_TOP_N", str(max(LLMConfig.TOP_K * 4, 12)))),
+            LLMConfig.TOP_K,
+        )
+        self.rerank_max_candidates = max(
+            int(os.getenv("RAG_RERANKER_MAX_CANDIDATES", "8")),
+            LLMConfig.TOP_K,
+        )
+        self.embedding_cache_size = max(int(os.getenv("RAG_EMBEDDING_CACHE_SIZE", "128")), 0)
+        self.query_cache_size = max(int(os.getenv("RAG_QUERY_CACHE_SIZE", "64")), 0)
+        self.query_cache_ttl = max(float(os.getenv("RAG_QUERY_CACHE_TTL_SECONDS", "30")), 0.0)
+        self._embedding_cache = OrderedDict()
+        self._query_cache = OrderedDict()
         
         # Khởi tạo Qdrant client
         self.qdrant_client = None
@@ -101,7 +117,11 @@ class LegalRetrieverService:
         reranker_name = os.getenv("RAG_RERANKER_MODEL", "").strip()
         self.reranker = (
             CrossEncoder(reranker_name)
-            if reranker_name and CrossEncoder is not None
+            if (
+                reranker_name
+                and os.getenv("RAG_ENABLE_RERANKER", "false").lower() in {"1", "true", "yes"}
+                and CrossEncoder is not None
+            )
             else None
         )
         
@@ -170,12 +190,12 @@ class LegalRetrieverService:
             embeddings = CustomEmbeddings(self.embedder)
             
             # Tạo Qdrant vector store với LangChain
-            self.vector_store = Qdrant(
+            self.vector_store = QdrantVectorStore(
                 client=self.qdrant_client,
                 collection_name=COLLECTION_NAME,
-                embeddings=embeddings,
+                embedding=embeddings,
                 content_payload_key="content",
-                metadata_payload_key="metadata"
+                metadata_payload_key="metadata",
             )
             
             # Tạo retriever với cấu hình
@@ -301,18 +321,41 @@ class LegalRetrieverService:
             self.stats["total_queries"] += 1
             
             understanding = understand_query(query)
-            variants = understanding["query_variants"] or [query]
             final_k = k or LLMConfig.TOP_K
-            candidate_limit = max(final_k * 4, 12)
+            cache_key = (
+                query.strip(),
+                final_k,
+                tuple(sorted((filter_conditions or {}).items())),
+                self.use_metadata_filtering,
+            )
+            cached = self._get_query_cache(cache_key)
+            if cached is not None:
+                self.stats["total_documents_retrieved"] += len(cached)
+                self.stats["avg_documents_per_query"] = (
+                    self.stats["total_documents_retrieved"] / self.stats["total_queries"]
+                )
+                return cached
+
+            variants = understanding["query_variants"] or [query]
+            unique_variants = {}
+            for variant in variants:
+                unique_variants.setdefault(fold_text(variant), variant)
+            variants = list(unique_variants.values())
+            candidate_limit = max(self.rerank_top_n, final_k * 4, 12)
             hits_by_id = {}
+            active_filter = filter_conditions
+            if active_filter is None and self.use_metadata_filtering:
+                active_filter = LLMConfig.DEFAULT_METADATA_FILTER
+            query_filter = self._build_qdrant_filter(active_filter or {})
 
             # Search multiple deterministic variants to improve recall for short,
             # colloquial, or acronym-based Vietnamese questions.
             for variant in variants:
-                query_embedding = self.embedder.embed_text(variant)
+                query_embedding = self._embed_query(variant)
                 search_result = self.qdrant_client.query_points(
                     collection_name=COLLECTION_NAME,
                     query=query_embedding.tolist(),
+                    query_filter=query_filter,
                     limit=candidate_limit,
                     score_threshold=self.similarity_threshold,
                     with_payload=True,
@@ -328,7 +371,7 @@ class LegalRetrieverService:
             # search as well; this prevents a generic semantic result from
             # hiding the explicitly requested legal source.
             for source_file in understanding["source_file_hints"]:
-                query_embedding = self.embedder.embed_text(query)
+                query_embedding = self._embed_query(query)
                 scoped_filter = models.Filter(
                     must=[
                         models.FieldCondition(
@@ -379,34 +422,56 @@ class LegalRetrieverService:
                         or understanding["article_number"] == str(metadata.get("article_number", ""))
                     )
                 )
+                exact_document_match = any(
+                    fold_text(str(metadata.get(key, ""))) == fold_text(hint)
+                    for key in ("title", "document_name")
+                    for hint in understanding["document_hints"]
+                )
                 exact_phrase_match = normalized_query and normalized_query in fold_text(searchable)
                 checklist_match = (
                     "checklist" in normalized_query
                     and "checklist" in fold_text(searchable)
                 )
+                status = fold_text(str(metadata.get("status", "")))
+                active_status_bonus = (
+                    0.08
+                    if any(term in status for term in ("con hieu luc", "dang hieu luc", "active"))
+                    else 0.0
+                )
+                inactive_status_penalty = (
+                    -0.15
+                    if any(term in status for term in ("het hieu luc", "bi thay the", "inactive"))
+                    else 0.0
+                )
                 return (
                     float(hit.score)
                     + min(overlap * 0.01, 0.08)
                     + min(document_match * 0.25, 0.25)
-                    + (0.04 if article_match else 0.0)
+                    + (0.24 if article_match else 0.0)
+                    + (0.20 if exact_document_match else 0.0)
                     + (0.35 if exact_phrase_match else 0.0)
                     + (0.25 if checklist_match else 0.0)
+                    + active_status_bonus
+                    + inactive_status_penalty
                 )
 
             if self.reranker and hits:
+                rerank_hits = hits[:self.rerank_max_candidates]
                 rerank_scores = self.reranker.predict(
                     [
                         (query, (hit.payload or {}).get("content", ""))
-                        for hit in hits
+                        for hit in rerank_hits
                     ]
                 )
-                hits = [
+                reranked = [
                     hit for _, hit in sorted(
-                        zip(rerank_scores, hits),
-                        key=lambda item: float(item[0]),
+                        zip(rerank_scores, rerank_hits),
+                        key=lambda item: float(item[0]) + 0.35 * ranking_score(item[1]),
                         reverse=True,
                     )
                 ]
+                remaining_hits = [hit for hit in hits if hit not in rerank_hits]
+                hits = reranked + remaining_hits
             else:
                 hits.sort(key=ranking_score, reverse=True)
 
@@ -443,12 +508,50 @@ class LegalRetrieverService:
                         verified = doc.metadata.get("is_verified", True)
                         print(f"   {i}. {title} - Điều {article} (verified: {verified})")
             
+            self._set_query_cache(cache_key, documents)
             return documents
             
         except Exception as e:
             error_msg = f"Lỗi khi retrieve documents: {str(e)}"
             print(f"❌ {error_msg}")
             raise RetrievalError(error_msg) from e
+
+    def _embed_query(self, query: str):
+        """Embed once per normalized query and reuse within the cache window."""
+        if not self.embedding_cache_size:
+            return self.embedder.embed_text(query)
+        key = fold_text(query.strip())
+        cached = self._embedding_cache.get(key)
+        if cached is not None:
+            self._embedding_cache.move_to_end(key)
+            return cached
+        embedding = self.embedder.embed_text(query)
+        self._embedding_cache[key] = embedding
+        self._embedding_cache.move_to_end(key)
+        while len(self._embedding_cache) > self.embedding_cache_size:
+            self._embedding_cache.popitem(last=False)
+        return embedding
+
+    def _get_query_cache(self, key):
+        if not self.query_cache_size or not self.query_cache_ttl:
+            return None
+        cached = self._query_cache.get(key)
+        if cached is None:
+            return None
+        created_at, documents = cached
+        if time.monotonic() - created_at > self.query_cache_ttl:
+            self._query_cache.pop(key, None)
+            return None
+        self._query_cache.move_to_end(key)
+        return list(documents)
+
+    def _set_query_cache(self, key, documents):
+        if not self.query_cache_size or not self.query_cache_ttl:
+            return
+        self._query_cache[key] = (time.monotonic(), list(documents))
+        self._query_cache.move_to_end(key)
+        while len(self._query_cache) > self.query_cache_size:
+            self._query_cache.popitem(last=False)
     
     def retrieve_with_scores(
         self, 

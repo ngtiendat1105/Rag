@@ -127,11 +127,12 @@ export function useChat(options: UseChatOptions = {}) {
   /**
    * Rate a message
    */
-  const rateMessage = useCallback((messageId: string, rating: 'like' | 'dislike') => {
-    chatStore.rateMessage(messageId, rating)
-    
-    // In real implementation, send rating to API
-    // apiService.rateMessage(messageId, rating)
+  const rateMessage = useCallback(async (messageId: string, rating: 'like' | 'dislike', reason = 'Không có lý do bổ sung') => {
+    const message = chatStore.chats
+      .flatMap(chat => chat.messages)
+      .find(item => item.id === messageId)
+    if (!message) return
+    await chatStore.rateMessage(messageId, rating, reason, message.content)
   }, [chatStore])
 
   /**

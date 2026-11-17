@@ -16,6 +16,27 @@ interface OTPCredentials {
   otp: string
 }
 
+export function useRequireAuth(redirectTo = '/login') {
+  const router = useRouter()
+  const isAuthenticated = useAuthStore((state) => state.isAuthenticated)
+
+  useEffect(() => {
+    if (!isAuthenticated) router.push(redirectTo)
+  }, [isAuthenticated, redirectTo, router])
+}
+
+export function useRequireRole(requiredRole: string, redirectTo = '/chat') {
+  const router = useRouter()
+  const { isAuthenticated, user } = useAuthStore((state) => ({
+    isAuthenticated: state.isAuthenticated,
+    user: state.user,
+  }))
+
+  useEffect(() => {
+    if (!isAuthenticated || user?.role !== requiredRole) router.push(redirectTo)
+  }, [isAuthenticated, requiredRole, redirectTo, router, user?.role])
+}
+
 export function useAuth() {
   const router = useRouter()
   const { user, token, isAuthenticated, login: storeLogin, logout: storeLogout } = useAuthStore()
@@ -140,25 +161,6 @@ export function useAuth() {
   /**
    * Require authentication
    */
-  const requireAuth = (redirectTo = '/login') => {
-    useEffect(() => {
-      if (!isAuthenticated) {
-        router.push(redirectTo)
-      }
-    }, [isAuthenticated, router, redirectTo])
-  }
-
-  /**
-   * Require specific role
-   */
-  const requireRole = (requiredRole: string, redirectTo = '/chat') => {
-    useEffect(() => {
-      if (!isAuthenticated || !hasRole(requiredRole)) {
-        router.push(redirectTo)
-      }
-    }, [isAuthenticated, user, router, redirectTo, requiredRole])
-  }
-
   return {
     // State
     user,
@@ -178,8 +180,8 @@ export function useAuth() {
     hasPermission,
     
     // Guards
-    requireAuth,
-    requireRole,
+    requireAuth: useRequireAuth,
+    requireRole: useRequireRole,
     
     // Utilities
     clearError: () => setError(null),

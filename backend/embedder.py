@@ -3,9 +3,15 @@ embedder.py - Class VietnameseEmbedder sử dụng sentence-transformers cho ti�
 Xử lý embedding văn bản tiếng Việt với model tối ưu hóa
 """
 
+import sys
 import time
 from typing import List, Optional, Union
 import numpy as np
+
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stderr, "reconfigure"):
+    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
 
 try:
     from sentence_transformers import SentenceTransformer

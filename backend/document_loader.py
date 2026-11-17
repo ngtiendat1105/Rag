@@ -88,9 +88,26 @@ def load_document(path: Path) -> Tuple[Dict[str, Any], str]:
 
 def _load_markdown(path: Path) -> Tuple[Dict[str, Any], str]:
     text = path.read_text(encoding="utf-8")
+    if text.startswith("\\---"):
+        text = text[1:]
     if text.startswith("---"):
         parts = text.split("---", 2)
         if len(parts) == 3:
             import yaml
-            return dict(yaml.safe_load(parts[1]) or {}), parts[2].lstrip()
+            frontmatter = parts[1]
+            try:
+                metadata = yaml.safe_load(frontmatter) or {}
+            except yaml.YAMLError:
+                # Some exported Markdown files escape Markdown punctuation inside YAML.
+                sanitized = (
+                    frontmatter
+                    .replace("\\_", "_")
+                    .replace("\\[", "[")
+                    .replace("\\]", "]")
+                )
+                metadata = yaml.safe_load(sanitized) or {}
+            content = parts[2].lstrip()
+            if "\\n" in content:
+                content = content.replace("\\n", "\n").replace("\\t", "\t")
+            return dict(metadata), content
     return {"document_type": "markdown"}, text

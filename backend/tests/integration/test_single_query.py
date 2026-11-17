@@ -26,7 +26,7 @@ def test_single_query():
         print(f"   ERROR: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, f"Không thể khởi tạo RAG pipeline: {e}"
     
     # Test query
     print("\n2. Testing query...")
@@ -41,7 +41,7 @@ def test_single_query():
         
         if 'error' in result:
             print(f"   Error: {result['error']}")
-            return False
+            assert False, result['error']
         
         print(f"   Answer length: {len(result.get('answer', ''))} chars")
         print(f"   Sources found: {result.get('num_sources', 0)}")
@@ -67,18 +67,17 @@ def test_single_query():
         print("\n" + "=" * 70)
         print("TEST COMPLETED SUCCESSFULLY")
         print("=" * 70)
-        return True
-        
+
     except Exception as e:
         print(f"\n   ERROR: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        assert False, f"RAG query failed: {e}"
 
 if __name__ == "__main__":
     try:
-        success = test_single_query()
-        sys.exit(0 if success else 1)
+        test_single_query()
+        sys.exit(0)
     except Exception as e:
         print(f"\nFATAL ERROR: {e}")
         import traceback

@@ -82,7 +82,7 @@ Nội dung chương bốn.
 
 
 def test_commercial_law_checklist_is_indexable():
-    source = Path(__file__).with_name("data_documents") / "06_Luat_Thuong_mai_2005.md"
+    source = Path(__file__).resolve().parents[2] / "data_documents" / "06_Luat_Thuong_mai_2005.md"
     metadata, content = load_document(source)
     chunks = MarkdownChunker().create_chunks_with_metadata(content, metadata)
 
@@ -174,6 +174,40 @@ def test_metadata_is_normalized_for_citations():
     assert metadata["article_number"] == "7"
     assert metadata["article"] == "7"
     assert metadata["weight"] == 1.0
+
+
+def test_markdown_frontmatter_and_article_number_are_preserved():
+    source = Path(__file__).resolve().parents[2] / "data_documents" / "01_Bo_luat_Lao_dong_2019.md"
+
+    metadata, content = load_document(source)
+    normalized = normalize_metadata(metadata, article_title="### Điều 21. Nội dung hợp đồng")
+
+    assert metadata["doc_id"] == "45/2019/QH14"
+    assert metadata["status"] == "Còn hiệu lực"
+    assert normalized["article_number"] == "21"
+    assert normalized["article"] == "21"
+    assert "BỘ LUẬT LAO ĐỘNG 2019" in content
+
+
+def test_metadata_status_is_available_for_retrieval_ranking():
+    current = normalize_metadata(
+        {"title": "Văn bản hiện hành", "status": "Còn hiệu lực"},
+        article_title="### Điều 1. Quy định",
+    )
+    replaced = normalize_metadata(
+        {"title": "Văn bản cũ", "status": "Hết hiệu lực"},
+        article_title="### Điều 1. Quy định",
+    )
+
+    assert current["status"] == "Còn hiệu lực"
+    assert replaced["status"] == "Hết hiệu lực"
+
+
+def test_retriever_latency_cache_helpers_are_available():
+    import retriever_service
+
+    assert callable(retriever_service.LegalRetrieverService._embed_query)
+    assert callable(retriever_service.LegalRetrieverService._get_query_cache)
 
 
 def test_evaluation_metrics_include_recall_mrr_and_citation_accuracy():
@@ -313,6 +347,8 @@ def test_rag_pipeline_e2e_with_mocked_llm_and_retriever():
     assert "mock" in result["answer"].lower()
     assert result["num_sources"] == 2
     assert result["has_warning"] is True
+    assert "Nguồn tham khảo" in result["answer"]
+    assert "VUI LÒNG KIỂM TRA LẠI" in result["answer"]
     assert len(retriever.calls) == 1
     assert result["sources"][0]["document"] == "Bộ luật Lao động"
     assert result["sources"][0]["article"] == "13"
@@ -336,6 +372,7 @@ def test_rag_pipeline_returns_no_context_message_without_documents():
 
     assert result["num_sources"] == 0
     assert "không chứa thông tin" in result["answer"]
+    assert "phòng Pháp chế" in result["answer"]
 
 
 def test_rag_pipeline_handles_llm_timeout_error():
@@ -351,7 +388,7 @@ def test_rag_pipeline_handles_llm_timeout_error():
             return RunnableLambda(_raise_timeout)
 
     pipeline = RAGPipeline(config=TimeoutConfig(), retriever_service=FakeRetriever())
-    result = pipeline.query("test timeout")
+    result = pipeline.query("Hợp đồng lao động bị timeout")
 
     assert "Lỗi hệ thống" in result["answer"]
     assert "LLM timeout" in result["answer"]

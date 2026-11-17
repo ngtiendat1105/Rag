@@ -5,6 +5,7 @@ Module này tạo pipeline RAG hoàn chỉnh tích hợp retrieval, context chec
 import logging
 import os
 import time
+from types import SimpleNamespace
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -71,39 +72,31 @@ class RAGPipeline:
         return chain
 
     def _build_prompt(self, question: str, raw_docs: List[Any]) -> str:
-        """Build a bounded prompt from the documents returned by one retrieval."""
-        context_parts = []
+        """Build the shared legal prompt from the documents returned by retrieval."""
+        documents = []
         remaining = MAX_CONTEXT_CHARS
-        for i, doc in enumerate(raw_docs[:MAX_CONTEXT_DOCUMENTS], 1):
+        for doc in raw_docs[:MAX_CONTEXT_DOCUMENTS]:
+            content = str(getattr(doc, "page_content", ""))
             if remaining <= 0:
                 break
-            metadata = doc.metadata or {}
-            title = metadata.get("title", metadata.get("document_name", "Văn bản pháp luật"))
-            article = metadata.get("article_number", metadata.get("article", ""))
-            header = f"--- TÀI LIỆU {i} ---"
-            if title:
-                header += f"\nNguồn: {title}"
-            if article:
-                header += f", Điều {article}"
-            block = f"{header}\n{doc.page_content}\n"
-            context_parts.append(block[:remaining])
-            remaining -= len(block)
+            bounded_content = content[:remaining]
+            documents.append(
+                {
+                    "content": bounded_content,
+                    "page_content": bounded_content,
+                    "metadata": getattr(doc, "metadata", {}) or {},
+                }
+            )
+            remaining -= len(bounded_content)
 
-        context = "\n".join(context_parts)
-        return f"""Bạn là chuyên gia pháp lý về luật lao động Việt Nam.
-
-CÂU HỎI: {question}
-
-TÀI LIỆU THAM KHẢO:
-{context}
-
-YÊU CẦU:
-- Trả lời DỰA TRÊN tài liệu trên
-- Sử dụng tiếng Việt rõ ràng, dễ hiểu
-- Nêu nguồn văn bản nếu có
-- NẾU không có thông tin, nói rõ "Tài liệu hiện tại không có thông tin về vấn đề này"
-
-TRẢ LỜI:"""
+        formatted_context = self.prompt_class.format_context_for_prompt(
+            documents,
+            include_warning=self._check_warning_required(documents),
+        )
+        return self.prompt_class.HUMAN_PROMPT_TEMPLATE.format(
+            question=question,
+            formatted_context=formatted_context,
+        )
 
     def _invoke_with_retry(self, prompt: str) -> str:
         attempts = int(getattr(self.config, "MAX_RETRIES", 2)) + 1
@@ -178,10 +171,7 @@ TRẢ LỜI:"""
             has_warning = self._check_warning_required(docs)
 
             if not raw_docs:
-                answer = (
-                    "Dữ liệu hiện tại không chứa thông tin về câu hỏi này. "
-                    "Vui lòng tham khảo văn bản pháp luật chính thức hoặc liên hệ phòng pháp chế."
-                )
+                answer = self.prompt_class.create_no_context_response(question)
             else:
                 answer = self._invoke_with_retry(self._build_prompt(question, raw_docs))
             
@@ -194,21 +184,38 @@ TRẢ LỜI:"""
                         "document_name",
                         metadata.get("title", metadata.get("doc_id", "Unknown"))
                     ),
-                    "article": metadata.get(
-                        "article",
-                        metadata.get("article_number", "N/A")
+                    "article": (
+                        metadata.get("article")
+                        or metadata.get("article_number")
+                        or "N/A"
                     ),
-                    "clause": metadata.get(
-                        "clause",
-                        metadata.get("clause_number", "N/A")
+                    "clause": (
+                        metadata.get("clause")
+                        or metadata.get("clause_number")
+                        or "N/A"
                     ),
                     "chunk_id": metadata.get("chunk_id", "N/A"),
                     "doc_id": metadata.get("doc_id", "N/A"),
                     "effective_date": metadata.get("effective_date", "N/A"),
                     "status": metadata.get("status", "N/A"),
-                    "is_verified": metadata.get("is_verified", True)
+                    "is_verified": metadata.get("is_verified", True),
+                    "page": metadata.get("page") or metadata.get("page_number"),
+                    "preview_url": (
+                        f"/api/documents/preview?name={metadata.get('document_name', metadata.get('title', ''))}"
+                        if str(metadata.get("document_name", metadata.get("title", ""))).lower().endswith(".pdf")
+                        else None
+                    ),
                 }
                 sources.append(source_info)
+
+            if sources:
+                citation_documents = [
+                    {"content": doc["page_content"], "metadata": doc["metadata"]}
+                    for doc in docs
+                ]
+                answer += self.prompt_class.create_citation_footer(citation_documents)
+                if has_warning:
+                    answer += self.prompt_class.UNVERIFIED_WARNING
             
             result = {
                 "question": question,
@@ -233,8 +240,39 @@ TRẢ LỜI:"""
                 "answer": f"Lỗi hệ thống: {str(e)}",
                 "sources": [],
                 "has_warning": False,
-                "error": str(e)
+                "error": str(e),
             }
+
+    def query_local_document(self, question: str, document_name: str, document_text: str) -> Dict[str, Any]:
+        """Answer using only the uploaded document, without querying the vector store."""
+        document = SimpleNamespace(
+                page_content=document_text,
+                metadata={
+                    "document_name": document_name,
+                    "doc_id": f"local:{document_name}",
+                    "is_verified": False,
+                },
+        )
+        answer = self._invoke_with_retry(self._build_prompt(question, [document]))
+        return {
+                "question": question,
+                "answer": answer,
+                "sources": [{
+                    "document": document_name,
+                    "doc_id": f"local:{document_name}",
+                    "chunk_id": f"local:{document_name}",
+                    "page": None,
+                    "preview_url": None,
+                    "is_verified": False,
+                }],
+                "has_warning": True,
+                "num_sources": 1,
+                "suggested_questions": [
+                    f"Tóm tắt các điểm chính trong {document_name}",
+                    f"Điều khoản nào trong {document_name} có rủi ro pháp lý?",
+                    f"Cần bổ sung gì để hoàn thiện {document_name}?",
+                ],
+        }
     
     def batch_query(self, questions: List[str]) -> List[Dict[str, Any]]:
         """

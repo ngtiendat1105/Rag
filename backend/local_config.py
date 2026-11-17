@@ -4,7 +4,8 @@ Cấu hình này sử dụng HuggingFace local model và disable các tính năn
 """
 
 import os
-from pathlib import Path
+from typing import Dict
+
 from config_llm import LLMConfig, LLMProvider
 
 class LocalLLMConfig(LLMConfig):
