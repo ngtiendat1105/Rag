@@ -21,6 +21,9 @@ TERM_EXPANSIONS = {
     "bhxh": "bảo hiểm xã hội",
     "bhyt": "bảo hiểm y tế",
     "bhtn": "bảo hiểm thất nghiệp",
+    "xung đột lợi ích": "xung đột lợi ích giao dịch liên quan lợi ích cá nhân",
+    "che giấu xung đột lợi ích": "không công khai xung đột lợi ích vi phạm trách nhiệm",
+    "chế tài": "xử lý vi phạm kỷ luật biện pháp xử lý",
 }
 
 INTENT_EXPANSIONS = {
@@ -77,6 +80,7 @@ SUPPORTED_TOPIC_TERMS = {
     "boi thuong", "thue", "dau tu", "canh tranh", "thuong mai", "giao dich",
     "chu ky", "bao mat", "du lieu", "kpi", "phuc loi", "co dong", "von",
     "hoa don", "che do", "thai san", "om dau", "tro cap", "huong",
+    "che tai", "xung dot", "loi ich", "quan tri", "chu so huu",
 }
 
 

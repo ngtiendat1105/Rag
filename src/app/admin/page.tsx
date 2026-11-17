@@ -3,16 +3,19 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { motion } from 'framer-motion'
-import { Shield, Users, Database, BarChart3 } from 'lucide-react'
+import { Shield, CheckCircle2, XCircle } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAuthHydrated } from '@/hooks/useAuthHydrated'
 import AdminSidebar from '@/components/admin/AdminSidebar'
-import DashboardStats from '@/components/admin/DashboardStats'
+import DashboardStats, { DashboardData } from '@/components/admin/DashboardStats'
+import { useState } from 'react'
 
 export default function AdminDashboard() {
   const router = useRouter()
   const authHydrated = useAuthHydrated()
   const { user, isAuthenticated } = useAuthStore()
+  const [dashboardData, setDashboardData] = useState<DashboardData | undefined>()
+  const [ragOnline, setRagOnline] = useState<boolean | null>(null)
 
   useEffect(() => {
     if (!authHydrated) return
@@ -26,6 +29,12 @@ export default function AdminDashboard() {
       router.push('/chat')
     }
   }, [authHydrated, isAuthenticated, user, router])
+  useEffect(() => {
+    if (authHydrated && isAuthenticated && user?.role === 'admin') {
+      fetch('/api/admin/dashboard', { cache: 'no-store' }).then(response => response.ok ? response.json() : Promise.reject()).then(setDashboardData).catch(() => setDashboardData(undefined))
+      fetch('/api/health', { cache: 'no-store' }).then(response => setRagOnline(response.ok)).catch(() => setRagOnline(false))
+    }
+  }, [authHydrated, isAuthenticated, user])
 
   if (!authHydrated || !isAuthenticated || user?.role !== 'admin') {
     return (
@@ -72,38 +81,13 @@ export default function AdminDashboard() {
           </motion.div>
         </div>
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          {[
-            { icon: <Users className="w-6 h-6" />, label: 'Tổng User', value: '1,248', color: 'from-primary-500 to-secondary-500' },
-            { icon: <Database className="w-6 h-6" />, label: 'Tài liệu', value: '156', color: 'from-accent-500 to-neon-cyan' },
-            { icon: <BarChart3 className="w-6 h-6" />, label: 'Cuộc trò chuyện', value: '8,742', color: 'from-neon-purple to-neon-pink' },
-            { icon: <Shield className="w-6 h-6" />, label: 'Active AI Models', value: '3', color: 'from-green-500 to-emerald-500' },
-          ].map((stat, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: index * 0.1 }}
-              whileHover={{ scale: 1.05 }}
-              className="glass-effect rounded-2xl p-6"
-            >
-              <div className={`w-12 h-12 rounded-xl mb-4 bg-gradient-to-br ${stat.color} flex items-center justify-center`}>
-                {stat.icon}
-              </div>
-              <div className="text-2xl font-bold mb-1">{stat.value}</div>
-              <div className="text-sm text-gray-400">{stat.label}</div>
-            </motion.div>
-          ))}
-        </div>
-
         {/* Dashboard Content */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <DashboardStats />
+          <DashboardStats data={dashboardData} />
         </motion.div>
 
         {/* System Status */}
@@ -116,23 +100,16 @@ export default function AdminDashboard() {
           <h3 className="text-lg font-bold mb-4">Trạng thái hệ thống</h3>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {[
-              { service: 'RAG Database', status: 'online', latency: '25ms', color: 'text-green-400' },
-              { service: 'AI Model API', status: 'online', latency: '120ms', color: 'text-green-400' },
-              { service: 'User Authentication', status: 'online', latency: '15ms', color: 'text-green-400' },
-              { service: 'Document Storage', status: 'online', latency: '45ms', color: 'text-green-400' },
-              { service: 'Real-time Chat', status: 'online', latency: '85ms', color: 'text-green-400' },
-              { service: 'Analytics Engine', status: 'maintenance', latency: 'N/A', color: 'text-yellow-400' },
-            ].map((service, index) => (
-              <div key={index} className="flex items-center justify-between gap-4 rounded-xl bg-dark-surface/50 p-4">
+            {[{ service: 'RAG API', status: ragOnline }, { service: 'Supabase', status: dashboardData !== undefined }, { service: 'Dữ liệu dashboard', status: dashboardData !== undefined }].map((service) => (
+              <div key={service.service} className="flex items-center justify-between gap-4 rounded-xl bg-dark-surface/50 p-4">
                 <div>
                   <div className="text-sm font-medium">{service.service}</div>
-                  <div className="text-sm text-gray-400">{service.latency}</div>
+                  <div className="text-sm text-gray-400">{service.status === null ? 'Đang kiểm tra...' : service.status ? 'Đã kết nối' : 'Không khả dụng'}</div>
                 </div>
-                <div className={`flex items-center gap-2 ${service.color}`}>
-                  <div className={`w-2 h-2 rounded-full ${service.status === 'online' ? 'bg-green-400' : 'bg-yellow-400'}`} />
+                <div className={`flex items-center gap-2 ${service.status ? 'text-green-400' : service.status === null ? 'text-yellow-400' : 'text-red-400'}`}>
+                  {service.status ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
                   <span className="text-sm font-medium whitespace-nowrap">
-                    {service.status === 'online' ? 'Online' : 'Maintenance'}
+                    {service.status === null ? 'Đang kiểm tra' : service.status ? 'Online' : 'Offline'}
                   </span>
                 </div>
               </div>

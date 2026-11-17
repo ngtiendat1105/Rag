@@ -3,6 +3,11 @@ export interface PopularQuestion {
   count: number
 }
 
+export interface QuestionRecord {
+  question: string
+  createdAt: string
+}
+
 function config() {
   const url = process.env.SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY
@@ -45,4 +50,9 @@ export async function recordQuestion(input: { userId: string; question: string }
 export async function listPopularQuestions(limit = 5) {
   const rows = await request(`/rpc/get_popular_questions?limit_count=${Math.min(Math.max(limit, 1), 10)}`) as PopularQuestion[]
   return rows.map(row => ({ question: row.question, count: Number(row.count) }))
+}
+
+export async function listRecentQuestions(limit = 1000): Promise<QuestionRecord[]> {
+  const rows = await request(`/chat_questions?select=question,created_at&order=created_at.desc&limit=${Math.min(Math.max(limit, 1), 2000)}`) as Array<{ question: string; created_at: string }>
+  return rows.map(row => ({ question: row.question, createdAt: row.created_at }))
 }
