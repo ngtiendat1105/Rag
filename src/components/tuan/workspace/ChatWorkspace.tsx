@@ -9,42 +9,35 @@ import {
   BookOpen,
   Briefcase,
   ChevronDown,
-  Copy,
   Download,
   FileText,
   LogOut,
-  Moon,
   PanelLeft,
-  Scale,
-  Sun,
   User as UserIcon,
   X,
 } from 'lucide-react'
 import ChatHistorySidebar from '@/components/chat/ChatHistorySidebar'
 import ChatInput from '@/components/chat/ChatInput'
 import ChatMessage from '@/components/chat/ChatMessage'
+import DocumentViewer from '@/components/chat/DocumentViewer'
 import TypingIndicator from '@/components/chat/TypingIndicator'
+import SourceInspector from '@/components/tuan/sources/SourceInspector'
+import BrandMark from '@/components/tuan/ui/BrandMark'
+import ThemeSwitch from '@/components/tuan/ui/ThemeSwitch'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { User } from '@/store/authStore'
-import { useChatStore, type ChatAttachment } from '@/store/chatStore'
+import { useChatStore, type ChatAttachment, type ChatReference } from '@/store/chatStore'
 import theme from '@/components/tuan/ui/theme.module.css'
 import styles from './workspace.module.css'
+import ChatGuide from './ChatGuide'
 
 const suggestions = [
   { icon: Briefcase, label: 'Hợp đồng lao động', question: 'Cần lưu ý gì khi ký hợp đồng lao động?' },
   { icon: BookOpen, label: 'Nghỉ phép năm', question: 'Người lao động được nghỉ phép năm bao nhiêu ngày?' },
   { icon: FileText, label: 'Bảo hiểm xã hội', question: 'Mức đóng bảo hiểm xã hội được xác định như thế nào?' },
 ]
-
-const guide = `HƯỚNG DẪN SỬ DỤNG TRỢ LÝ PHÁP LÝ NỘI BỘ
-
-1. Đặt câu hỏi cụ thể, nêu số điều, tên văn bản hoặc phòng ban nếu bạn biết.
-2. Mở nguồn tham chiếu để đối chiếu câu trả lời với văn bản gốc.
-3. Lưu trữ, bỏ lưu trữ hoặc xuất hội thoại thành tệp .txt khi cần.
-4. Chọn Thử lại nếu dịch vụ gặp lỗi. Tránh gửi dữ liệu cá nhân hoặc thông tin mật không cần thiết.`
 
 function downloadText(content: string, name: string) {
   const url = URL.createObjectURL(new Blob(['\uFEFF', content], { type: 'text/plain;charset=utf-8' }))
@@ -58,6 +51,13 @@ function downloadText(content: string, name: string) {
 interface Props {
   user: User
   onLogout: () => void
+}
+
+interface SourceSelection {
+  chatId: string | null
+  messageId: string
+  index: number
+  reference: ChatReference
 }
 
 export default function ChatWorkspace({ user, onLogout }: Props) {
@@ -75,12 +75,18 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
   const [showGuide, setShowGuide] = useState(false)
   const [confirmLogout, setConfirmLogout] = useState(false)
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
+  const [sourceSelection, setSourceSelection] = useState<SourceSelection | null>(null)
+  const [previewing, setPreviewing] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
+  const visibleMessages = useRef<{ chatId: string | null; ids: Set<string> } | null>(null)
+  const accountRef = useRef<HTMLDetailsElement>(null)
   const drawerRef = useRef<HTMLDialogElement>(null)
+  const sourceTriggerRef = useRef<HTMLButtonElement | null>(null)
   const activeChat = chats.find(chat => chat.id === activeChatId)
   const deleteTarget = chats.find(chat => chat.id === deleteTargetId)
   const messages = activeChat?.messages
+  const selectedSource = sourceSelection?.chatId === activeChatId ? sourceSelection : null
   const waitingForReply = isTyping && messages?.[messages.length - 1]?.status === 'sending'
   const hasMessages = Boolean(messages?.length)
   const latestReply = messages?.slice().reverse().find(message => message.role === 'assistant' && message.status !== 'error')
@@ -122,6 +128,24 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
     if (transcript && nearBottom) transcript.scrollTop = transcript.scrollHeight
   }, [messages, waitingForReply, nearBottom])
 
+  useEffect(() => {
+    const previous = visibleMessages.current
+    visibleMessages.current = { chatId: activeChatId, ids: new Set(messages?.map(message => message.id)) }
+    const firstSend = previous?.chatId === null && messages?.length === 1 && waitingForReply
+    if (!previous || (previous.chatId !== activeChatId && !firstSend)) return
+    if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) return
+
+    transcriptRef.current?.querySelectorAll<HTMLElement>('[data-message-id]').forEach(entry => {
+      const id = entry.dataset.messageId
+      if (!id || previous.ids.has(id)) return
+      const offset = entry.dataset.role === 'user' ? 8 : -8
+      entry.animate(
+        [{ opacity: 0.45, transform: `translate(${offset}px, 6px)` }, { opacity: 1, transform: 'translate(0, 0)' }],
+        { duration: 290, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      )
+    })
+  }, [activeChatId, messages, waitingForReply])
+
   function applyTheme() {
     const next = appearance === 'dark' ? 'light' : 'dark'
     setAppearance(next)
@@ -133,6 +157,8 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
   }
 
   function startChat() {
+    setSourceSelection(null)
+    setPreviewing(false)
     createNewChat()
     setDraft('')
     setComposerVersion(version => version + 1)
@@ -143,6 +169,8 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
 
   function selectChat(id: string) {
     if (id !== activeChatId) {
+      setSourceSelection(null)
+      setPreviewing(false)
       setActiveChat(id)
       setDraft('')
       setComposerVersion(version => version + 1)
@@ -154,6 +182,13 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
   function fillDraft(question: string) {
     setDraft(question)
     inputRef.current?.focus()
+  }
+
+  function closeSource() {
+    setSourceSelection(null)
+    setPreviewing(false)
+    if (sourceTriggerRef.current?.isConnected) sourceTriggerRef.current.focus()
+    sourceTriggerRef.current = null
   }
 
   async function submitQuestion(question: string, attachments: ChatAttachment[], files: File[]) {
@@ -171,15 +206,6 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
     downloadText(content, `legal-ai-${chat.id}.txt`)
   }
 
-  async function copyGuide() {
-    try {
-      await navigator.clipboard.writeText(guide)
-      showToast('Đã sao chép hướng dẫn.')
-    } catch {
-      showToast('Không thể sao chép hướng dẫn.', 'info')
-    }
-  }
-
   const sidebarProps = {
     chats, activeChatId,
     onChatSelect: selectChat, onNewChat: startChat, onArchiveChat: archiveChat,
@@ -187,8 +213,26 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
     onDeleteChat: (id: string) => { closeDrawer(); setDeleteTargetId(id) },
   }
 
+  const questionSuggestions = showSuggestions && questions.length > 0 && (
+    <div className={styles.questionSuggestions}>
+      <div role="group" aria-label="Câu hỏi gợi ý">
+        {Array.from(new Set(questions)).map(question => (
+          <button key={question} title={question} type="button" className={theme.actionButton} disabled={isTyping} onClick={() => fillDraft(question)}>
+            <span>{question}</span>
+          </button>
+        ))}
+      </div>
+      <button className={theme.iconButton} aria-label="Ẩn câu hỏi gợi ý" type="button" onClick={() => {
+        sessionStorage.setItem('chat-suggestions-hidden', 'true')
+        setShowSuggestions(false)
+      }}>
+        <X size={16} aria-hidden="true" />
+      </button>
+    </div>
+  )
+
   return (
-    <main className={`${theme.theme} ${styles.workspace}`} data-theme={appearance}>
+    <main className={`${theme.theme} ${styles.workspace}`} data-theme={appearance} data-source-open={Boolean(selectedSource)}>
       <div className={styles.desktopSidebar}>
         <ChatHistorySidebar {...sidebarProps} />
       </div>
@@ -206,10 +250,10 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               <PanelLeft size={20} aria-hidden="true" />
             </button>
             <div className="min-w-0">
-              <p className={styles.breadcrumb}>Không gian làm việc</p>
               <p className={styles.conversationTitle} title={activeChat?.title}>
                 {activeChat?.title ?? 'Tra cứu pháp lý'}
               </p>
+              {activeChat?.status === 'archived' && <p className={styles.conversationStatus}>Đã lưu trữ</p>}
             </div>
           </div>
 
@@ -226,6 +270,7 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               </button>
             )}
             <details
+              ref={accountRef}
               className={styles.account}
               onBlur={event => {
                 if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false
@@ -245,15 +290,15 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
                 <ChevronDown size={14} aria-hidden="true" />
               </summary>
               <div className={styles.accountOptions}>
-                <button type="button" className={theme.actionButton} onClick={applyTheme}>
-                  {appearance === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
-                  {appearance === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
-                </button>
+                <ThemeSwitch dark={appearance === 'dark'} onToggle={applyTheme} />
                 <Link className={theme.actionButton} href="/profile">
                   <UserIcon size={17} aria-hidden="true" />
                   Hồ sơ cá nhân
                 </Link>
-                <button type="button" className={theme.actionButton} onClick={() => setShowGuide(true)}>
+                <button type="button" className={theme.actionButton} aria-haspopup="dialog" onClick={() => {
+                  if (accountRef.current) accountRef.current.open = false
+                  setShowGuide(true)
+                }}>
                   <BookOpen size={17} aria-hidden="true" /> Hướng dẫn sử dụng
                 </button>
                 <button type="button" className={theme.actionButton} onClick={() => setConfirmLogout(true)}>
@@ -265,96 +310,106 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
           </div>
         </header>
 
-        <div
-          ref={transcriptRef}
-          className={styles.scrollArea}
-          onScroll={event => {
-            const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
-            setNearBottom(scrollHeight - scrollTop - clientHeight < 80)
-          }}
-        >
-          {hasMessages ? (
-            <div className={styles.transcript} role="log" aria-label="Tin nhắn hội thoại">
-              <h1 className="sr-only">{activeChat?.title}</h1>
-              {messages?.map((message, index) => {
-                const previous = messages[index - 1]
-                const failedQuestion = message.role === 'assistant' && message.status === 'error' && previous?.role === 'user' ? previous : null
-                const needsFiles = Boolean(failedQuestion?.attachments?.length)
-                return (
-                  <ChatMessage
-                    key={message.id}
-                    {...message}
-                    onRate={(rating, reason, detail) => rateMessage(message.id, rating, reason, message.content, detail)}
-                    onRetry={failedQuestion ? () => {
-                      if (needsFiles) {
-                        fillDraft(failedQuestion.content)
-                        showToast('Hãy chọn lại tệp đính kèm trước khi gửi.', 'info')
-                        return
-                      }
-                      setNearBottom(true)
-                      void retryMessage(message.id)
-                    } : undefined}
-                    retryLabel={needsFiles ? 'Soạn lại câu hỏi' : undefined}
-                    retryDisabled={isTyping}
-                  />
-                )
-              })}
-              {waitingForReply && <TypingIndicator message={processingStage} />}
-            </div>
-          ) : (
-            <div className={styles.empty}>
-              <div className={styles.emblem}><Scale size={29} strokeWidth={1.6} aria-hidden="true" /></div>
-              <h1>Bạn muốn tra cứu gì?</h1>
-              <p>Đặt câu hỏi về quy định pháp luật và tài liệu nội bộ. Bạn có thể mở nguồn tham chiếu ngay trong câu trả lời.</p>
-              <ul className={styles.suggestions} aria-label="Gợi ý câu hỏi">
-                {suggestions.map(({ icon: Icon, label, question }) => (
-                  <li key={label}>
-                    <button type="button" onClick={() => fillDraft(question)} disabled={isTyping}>
-                      <Icon size={19} aria-hidden="true" />
-                      <span><strong>{label}</strong><span>{question}</span></span>
-                      <ArrowUpRight className={styles.suggestionArrow} size={16} aria-hidden="true" />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-        </div>
-
-        <div className={styles.composerRegion}>
-          {hasMessages && !nearBottom && (
-            <button type="button" className={`${theme.actionButton} ${styles.scrollButton}`} onClick={() => setNearBottom(true)}>
-              <ArrowDown size={16} aria-hidden="true" /> Đến tin mới nhất
-            </button>
-          )}
-          {showSuggestions && questions.length > 0 && (
-            <div className={styles.questionSuggestions}>
-              <div role="group" aria-label="Câu hỏi gợi ý">
-                {Array.from(new Set(questions)).map(question => (
-                  <button key={question} title={question} type="button" className={theme.actionButton} disabled={isTyping} onClick={() => fillDraft(question)}>
-                    <span>{question}</span>
-                  </button>
-                ))}
+        <div className={styles.stage} data-empty={!hasMessages}>
+          {hasMessages && (
+            <div
+              ref={transcriptRef}
+              className={styles.scrollArea}
+              onScroll={event => {
+                const { scrollHeight, scrollTop, clientHeight } = event.currentTarget
+                setNearBottom(scrollHeight - scrollTop - clientHeight < 80)
+              }}
+            >
+              <div className={styles.transcript} role="log" aria-label="Tin nhắn hội thoại">
+                <h1 className="sr-only">{activeChat?.title}</h1>
+                {messages?.map((message, index) => {
+                  const previous = messages[index - 1]
+                  const failedQuestion = message.role === 'assistant' && message.status === 'error' && previous?.role === 'user' ? previous : null
+                  const needsFiles = Boolean(failedQuestion?.attachments?.length)
+                  return (
+                    <ChatMessage
+                      key={message.id}
+                      {...message}
+                      selectedReferenceIndex={selectedSource?.messageId === message.id ? selectedSource.index : undefined}
+                      onSelectReference={(reference, sourceIndex, trigger) => {
+                        sourceTriggerRef.current = trigger
+                        setSourceSelection({ chatId: activeChatId, messageId: message.id, index: sourceIndex, reference })
+                      }}
+                      onRate={(rating, reason, detail) => rateMessage(message.id, rating, reason, message.content, detail)}
+                      onRetry={failedQuestion ? () => {
+                        if (needsFiles) {
+                          fillDraft(failedQuestion.content)
+                          showToast('Hãy chọn lại tệp đính kèm trước khi gửi.', 'info')
+                          return
+                        }
+                        setNearBottom(true)
+                        void retryMessage(message.id)
+                      } : undefined}
+                      retryLabel={needsFiles ? 'Soạn lại câu hỏi' : undefined}
+                      retryDisabled={isTyping}
+                    />
+                  )
+                })}
+                {waitingForReply && <TypingIndicator message={processingStage} />}
               </div>
-              <button className={theme.iconButton} aria-label="Ẩn câu hỏi gợi ý" type="button" onClick={() => {
-                sessionStorage.setItem('chat-suggestions-hidden', 'true')
-                setShowSuggestions(false)
-              }}>
-                <X size={16} aria-hidden="true" />
-              </button>
             </div>
           )}
-          <ChatInput
-            key={composerVersion}
-            inputRef={inputRef}
-            value={draft}
-            onValueChange={setDraft}
-            onSendMessage={submitQuestion}
-            onCancel={cancelMessage}
-            isLoading={isTyping}
-          />
+
+          <div className={styles.composerRegion}>
+            {!hasMessages && (
+              <div className={styles.emptyIntro}>
+                <div className={styles.emblem}><BrandMark size={66} /></div>
+                <h1>Bạn muốn tra cứu gì?</h1>
+                <p>Hỏi về pháp luật và quy định nội bộ. Mở nguồn tham chiếu để đối chiếu câu trả lời.</p>
+              </div>
+            )}
+            {hasMessages && !nearBottom && (
+              <button type="button" className={`${theme.actionButton} ${styles.scrollButton}`} onClick={() => setNearBottom(true)}>
+                <ArrowDown size={16} aria-hidden="true" /> Đến tin mới nhất
+              </button>
+            )}
+            {hasMessages && questionSuggestions}
+            <ChatInput
+              key={composerVersion}
+              inputRef={inputRef}
+              value={draft}
+              onValueChange={setDraft}
+              onSendMessage={submitQuestion}
+              onCancel={cancelMessage}
+              isLoading={isTyping}
+            />
+            {!hasMessages && (
+              <>
+                <ul className={styles.suggestions} aria-label="Chủ đề gợi ý" role="list">
+                  {suggestions.map(({ icon: Icon, label, question }) => (
+                    <li key={label}>
+                      <button type="button" title={question} onClick={() => fillDraft(question)} disabled={isTyping}>
+                        <span className={styles.suggestionIcon}><Icon size={18} aria-hidden="true" /></span>
+                        <ArrowUpRight className={styles.suggestionArrow} size={16} aria-hidden="true" />
+                        <span className={styles.suggestionCopy}><strong>{label}</strong><span>{question}</span></span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+                {questionSuggestions}
+              </>
+            )}
+          </div>
         </div>
       </section>
+
+      {selectedSource && (
+        <SourceInspector
+          key={`${selectedSource.messageId}-${selectedSource.index}`}
+          reference={selectedSource.reference}
+          previewing={previewing}
+          onPreview={() => setPreviewing(true)}
+          onClose={closeSource}
+        />
+      )}
+      {previewing && selectedSource && (
+        <DocumentViewer reference={selectedSource.reference} onClose={() => setPreviewing(false)} />
+      )}
 
       <dialog
         ref={drawerRef}
@@ -379,17 +434,13 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
         <ConfirmDialog isOpen title="Đăng xuất khỏi hệ thống?" message="Phiên làm việc hiện tại sẽ kết thúc trên thiết bị này." confirmLabel="Đăng xuất" onClose={() => setConfirmLogout(false)} onConfirm={onLogout} />
       )}
       {showGuide && (
-        <Modal isOpen title="Hướng dẫn sử dụng" tone="light" size="sm" onClose={() => setShowGuide(false)}>
-          <p className="max-h-[50dvh] overflow-auto whitespace-pre-line text-sm leading-relaxed">{guide}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-slate-700">
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => void copyGuide()}>
-              <Copy size={16} aria-hidden="true" /> Sao chép
-            </button>
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => downloadText(guide, 'huong-dan-su-dung-chatbot.txt')}>
-              <Download size={16} aria-hidden="true" /> Xuất hướng dẫn
-            </button>
-          </div>
-        </Modal>
+        <ChatGuide
+          onClose={() => {
+            setShowGuide(false)
+            accountRef.current?.querySelector('summary')?.focus()
+          }}
+          onDownload={text => downloadText(text, 'huong-dan-su-dung-chatbot.txt')}
+        />
       )}
     </main>
   )

@@ -1,32 +1,42 @@
 import Link from 'next/link'
-import { ArrowLeft, Shield, ArrowRight } from 'lucide-react'
-import SimpleBackground from '@/components/3d/SimpleBackground'
+import { ArrowRight } from 'lucide-react'
+import AuthPageLayout from '@/components/auth/AuthPageLayout'
+import theme from '@/components/tuan/ui/theme.module.css'
+import publicStyles from '../public-site.module.css'
+import styles from './register.module.css'
+
+const steps = [
+  { title: 'Liên hệ bộ phận IT', description: 'Gửi yêu cầu cấp quyền cho IT hoặc quản trị viên Legal AI của công ty.' },
+  { title: 'Cung cấp thông tin', description: 'Gửi họ tên, email công ty và phòng ban để quản trị viên cấp quyền phù hợp.' },
+  { title: 'Đăng nhập sau khi được cấp quyền', description: 'Dùng email công ty và xác thực bằng mã OTP gửi đến hộp thư.' },
+]
 
 export default function RegisterPage() {
   return (
-    <main className="relative flex min-h-screen items-center justify-center bg-dark-bg px-4 py-12">
-      <SimpleBackground />
-      <section aria-labelledby="register-title" className="glass-effect relative z-10 w-full max-w-lg rounded-3xl p-6 sm:p-10">
-        <Link href="/" className="inline-flex min-h-[44px] items-center gap-2 rounded-lg text-sm text-gray-300 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">
-          <ArrowLeft aria-hidden="true" className="h-4 w-4" /> Trang chủ
-        </Link>
-        <Shield aria-hidden="true" className="mb-6 mt-6 h-12 w-12 text-primary-400" />
-        <h1 id="register-title" className="mb-4 text-3xl font-bold">Đăng ký tài khoản</h1>
-        <p className="mb-6 leading-relaxed text-gray-300">
-          Legal AI dành cho nhân viên doanh nghiệp. Tài khoản được bộ phận IT cấp để bảo đảm quyền truy cập vào tài liệu nội bộ.
-        </p>
-        <div className="mb-8 rounded-2xl border border-white/10 bg-white/5 p-5">
-          <h2 className="mb-3 font-semibold">Cách đăng ký</h2>
-          <ol className="list-decimal space-y-3 pl-5 text-sm leading-relaxed text-gray-300">
-            <li>Liên hệ bộ phận IT hoặc quản trị viên của công ty.</li>
-            <li>Cung cấp họ tên, email công ty và phòng ban để yêu cầu tài khoản.</li>
-            <li>Sau khi được cấp tài khoản, đăng nhập để bắt đầu sử dụng.</li>
-          </ol>
+    <AuthPageLayout titleId="register-title">
+      <div className={styles.content}>
+        <div className={styles.heading}>
+          <h1 id="register-title">Đăng ký tài khoản</h1>
+          <p>Tài khoản Legal AI do công ty cấp để bạn truy cập tài liệu nội bộ.</p>
         </div>
-        <Link href="/login" className="flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-primary-600 to-secondary-600 px-5 py-3 font-semibold hover:from-primary-500 hover:to-secondary-500 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-400">
-          Đã có tài khoản? Đăng nhập <ArrowRight aria-hidden="true" className="h-4 w-4" />
-        </Link>
-      </section>
-    </main>
+        <ol className={styles.steps} aria-label="Các bước xin cấp tài khoản" role="list">
+          {steps.map(({ title, description }, index) => (
+            <li key={title}>
+              <span className={styles.stepNumber} aria-hidden="true">{index + 1}</span>
+              <div>
+                <h2>{title}</h2>
+                <p>{description}</p>
+              </div>
+            </li>
+          ))}
+        </ol>
+        <div className={styles.actions}>
+          <p>Đã được cấp tài khoản?</p>
+          <Link href="/login" className={`${theme.primaryButton} ${publicStyles.press} ${styles.loginLink}`}>
+            Đăng nhập <ArrowRight size={17} aria-hidden="true" />
+          </Link>
+        </div>
+      </div>
+    </AuthPageLayout>
   )
 }

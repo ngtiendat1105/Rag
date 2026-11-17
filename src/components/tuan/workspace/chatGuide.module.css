@@ -1,0 +1,118 @@
+.body {
+  display: grid;
+  min-height: 0;
+  gap: 13px;
+  padding: 20px 23px;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.body:focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: -2px;
+}
+
+.steps {
+  padding-inline: 14px;
+  border: 1px solid var(--ui-line);
+  border-radius: 13px;
+  background: var(--ui-canvas);
+  list-style: none;
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  padding-block: 13px;
+}
+
+.steps li + li {
+  border-top: 1px solid var(--ui-line);
+}
+
+.number {
+  display: grid;
+  width: 30px;
+  height: 30px;
+  place-items: center;
+  border: 1px solid var(--ui-line);
+  border-radius: 8px;
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+  font-size: 0.8125rem;
+  font-weight: 740;
+}
+
+.steps h3 {
+  margin: 2px 0 4px;
+  font-size: 0.9375rem;
+  font-weight: 720;
+  line-height: 1.25;
+}
+
+.steps p,
+.note p,
+.feedback {
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.note {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--ui-accent-surface);
+}
+
+.note p,
+.note svg {
+  color: var(--ui-accent);
+}
+
+.note svg { flex: none; margin-top: 1px; }
+
+.footer {
+  display: flex;
+  flex: none;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 12px 23px;
+  border-top: 1px solid var(--ui-line);
+}
+
+.feedback {
+  flex: 1 0 160px;
+  color: var(--ui-primary);
+}
+
+.feedback:empty { flex-basis: 0; }
+.feedback[data-error='true'] { color: var(--ui-danger); }
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+  margin-inline-start: auto;
+}
+
+.actions .copy {
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+
+.actions .copy:hover { background: var(--ui-hover); }
+
+@media (max-width: 520px) {
+  .body { gap: 10px; padding: 13px 14px; }
+  .steps { padding-inline: 10px; }
+  .steps li { gap: 8px; padding-block: 10px; }
+  .number { width: 26px; height: 26px; }
+  .footer { padding: 9px 14px; }
+}

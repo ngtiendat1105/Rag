@@ -1,0 +1,104 @@
+.dialog {
+  position: fixed;
+  inset: 0;
+  width: min(calc(100% - 32px), var(--chat-dialog-width, 610px));
+  max-width: none;
+  max-height: calc(100dvh - 32px);
+  margin: auto;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--ui-line);
+  border-radius: 20px;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  box-shadow: 0 28px 80px rgb(8 21 43 / 35%);
+}
+
+.dialog[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.dialog::backdrop {
+  background: rgb(9 19 36 / 61%);
+}
+
+.header {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  flex: none;
+  align-items: center;
+  gap: 13px;
+  padding: 20px 23px;
+  overflow: hidden;
+  background: radial-gradient(ellipse at 90% 0%, #2e4b75, transparent 74%), linear-gradient(110deg, #111e34, #192f50);
+  color: #f7f9ff;
+  --ui-focus: #aecbfa;
+}
+
+.header::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(90deg, rgb(178 205 251 / 14%) 1px, transparent 1px),
+    linear-gradient(rgb(178 205 251 / 14%) 1px, transparent 1px);
+  background-size: 26px 26px;
+  mask-image: linear-gradient(90deg, transparent 20%, #000 100%);
+  pointer-events: none;
+  content: '';
+}
+
+.headerIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgb(245 222 182 / 38%);
+  border-radius: 11px;
+  background: rgb(231 196 137 / 13%);
+  color: #f3ddba;
+}
+
+.header h2 {
+  font-size: clamp(1.2rem, 3.1vw, 1.6rem);
+  font-weight: 740;
+  letter-spacing: -0.03em;
+  line-height: 1.18;
+}
+
+.header p {
+  margin-top: 5px;
+  color: #d7e4f9;
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.header button {
+  color: #dce7fc;
+}
+
+.header button:hover { background: rgb(230 242 255 / 13%); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .dialog[open] { animation: dialog-enter 320ms var(--chat-ease) both; }
+  .dialog[open]::backdrop { animation: backdrop-enter 230ms ease-out both; }
+}
+
+@keyframes dialog-enter {
+  from { opacity: 0.1; transform: translateY(12px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@media (max-width: 520px) {
+  .dialog { width: calc(100% - 24px); max-height: calc(100dvh - 24px); border-radius: 16px; }
+  .header { gap: 9px; padding: 13px 14px; }
+  .headerIcon { width: 38px; height: 38px; }
+  .headerIcon > svg { width: 21px; height: 21px; }
+}

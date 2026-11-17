@@ -1,11 +1,35 @@
 .workspace {
   display: grid;
-  grid-template-columns: 270px minmax(0, 1fr);
+  grid-template-columns: 256px minmax(0, 1fr);
   height: 100dvh;
   min-width: 0;
   overflow: hidden;
   background: var(--ui-canvas);
   color: var(--ui-text);
+  --chat-ease: cubic-bezier(0.22, 1, 0.36, 1);
+  --chat-desk-glow: #e8effc;
+  --chat-grid: rgb(62 91 142 / 11%);
+  --chat-card-shadow: 0 12px 28px -18px rgb(29 54 101 / 32%);
+  --chat-send-fill: linear-gradient(135deg, #1a365e, #2c5191);
+  --chat-send-hover: linear-gradient(135deg, #203f70, #3560a6);
+  --chat-send-icon: #f3ddba;
+  --chat-send-icon-surface: rgb(244 221 187 / 14%);
+}
+
+.workspace[data-theme='dark'] {
+  --chat-desk-glow: #1e2d47;
+  --chat-grid: rgb(174 197 237 / 13%);
+  --chat-card-shadow: 0 12px 28px -18px rgb(0 0 0 / 60%);
+  --chat-send-fill: linear-gradient(135deg, #d5e6fa, #a8c5ed);
+  --chat-send-hover: linear-gradient(135deg, #e1edff, #bcd5f7);
+  --chat-send-icon: #18375f;
+  --chat-send-icon-surface: rgb(36 74 137 / 15%);
+}
+
+@media (min-width: 1200px) {
+  .workspace[data-source-open='true'] {
+    grid-template-columns: 256px minmax(0, 1fr) clamp(300px, 23vw, 380px);
+  }
 }
 
 .desktopSidebar {
@@ -24,12 +48,12 @@
   position: relative;
   z-index: 2;
   display: flex;
-  min-height: 70px;
+  min-height: var(--ui-header-height);
   flex: none;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 8px 26px;
+  padding: 8px 24px;
   border-bottom: 1px solid var(--ui-line);
   background: var(--ui-surface);
 }
@@ -49,7 +73,11 @@
   flex: none;
 }
 
-.breadcrumb {
+.headerActions > button {
+  color: var(--ui-muted);
+}
+
+.conversationStatus {
   color: var(--ui-muted);
   font-size: 0.75rem;
 }
@@ -57,7 +85,8 @@
 .conversationTitle {
   overflow: hidden;
   font-size: 0.9375rem;
-  font-weight: 650;
+  font-weight: 740;
+  letter-spacing: -0.012em;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
@@ -71,7 +100,10 @@
 }
 
 .account summary {
-  padding-inline: 6px;
+  gap: 9px;
+  padding-inline: 7px 9px;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-canvas);
   cursor: pointer;
   list-style: none;
 }
@@ -79,6 +111,9 @@
 .account summary::-webkit-details-marker {
   display: none;
 }
+
+.account[open] summary { background: var(--ui-selected); }
+.account[open] summary > svg:last-child { transform: rotate(180deg); }
 
 .avatar {
   display: grid;
@@ -124,12 +159,44 @@
   overscroll-behavior: contain;
 }
 
-.empty,
+.stage {
+  display: flex;
+  min-height: 0;
+  flex: 1;
+  flex-direction: column;
+}
+
+.stage[data-empty='true'] {
+  position: relative;
+  isolation: isolate;
+  overflow: auto;
+  background: radial-gradient(ellipse 76% 65% at 56% 28%, var(--chat-desk-glow), transparent 75%), var(--ui-canvas);
+}
+
+.stage[data-empty='true']::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto;
+  height: min(100%, 460px);
+  background-image: linear-gradient(90deg, var(--chat-grid) 1px, transparent 1px),
+    linear-gradient(var(--chat-grid) 1px, transparent 1px);
+  background-size: 42px 42px;
+  mask-image: radial-gradient(ellipse 56% 56% at 50% 42%, #000, transparent 94%);
+  pointer-events: none;
+  content: '';
+}
+
 .transcript,
 .composerRegion {
-  width: min(100%, 824px);
+  width: min(100%, 860px);
   margin-inline: auto;
   padding-inline: 28px;
+}
+
+.stage[data-empty='true'] .composerRegion {
+  width: min(100%, 858px);
+  margin-block: auto;
+  padding-block: 35px 50px;
 }
 
 .questionSuggestions {
@@ -145,6 +212,7 @@
   flex: 1;
   gap: 5px;
   overflow-x: auto;
+  padding: 4px;
 }
 
 .questionSuggestions > div button {
@@ -154,44 +222,66 @@
   background: var(--ui-surface);
 }
 
+.questionSuggestions > div button:hover:not(:disabled) {
+  border-color: var(--ui-focus);
+  background: var(--ui-selected);
+}
+
 .questionSuggestions span {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.empty {
+.emptyIntro {
   display: flex;
-  min-height: 100%;
   flex-direction: column;
-  justify-content: center;
   align-items: center;
-  padding-block: 42px;
+  margin-bottom: 26px;
   text-align: center;
 }
 
 .emblem {
+  position: relative;
+  isolation: isolate;
   display: grid;
-  width: 62px;
-  height: 62px;
+  width: 66px;
+  height: 66px;
   place-items: center;
-  margin-bottom: 23px;
-  border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius-lg);
-  background: var(--ui-accent-surface);
-  color: var(--ui-accent);
+  margin-bottom: 20px;
 }
 
-.empty h1 {
-  font-size: clamp(1.75rem, 4vw, 2.75rem);
-  font-weight: 650;
-  letter-spacing: -0.045em;
-  line-height: 1.2;
+.emblem > img {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 9px 12px rgb(22 44 78 / 33%));
 }
 
-.empty > p {
-  max-width: 450px;
-  margin-top: 11px;
+.emblem::before,
+.emblem::after {
+  position: absolute;
+  z-index: -1;
+  inset: -7px;
+  border: 1px solid var(--chat-grid);
+  border-radius: 26px;
+  content: '';
+}
+
+.emblem::after {
+  inset: -14px;
+  border-radius: 32px;
+}
+
+.emptyIntro h1 {
+  font-size: clamp(1.85rem, 4.15vw, 3.25rem);
+  font-weight: 750;
+  letter-spacing: -0.054em;
+  line-height: 1.13;
+}
+
+.emptyIntro p {
+  max-width: 390px;
+  margin-top: 10px;
   color: var(--ui-muted);
   font-size: 0.9375rem;
   line-height: 1.65;
@@ -200,29 +290,53 @@
 
 .suggestions {
   display: grid;
-  width: 100%;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 10px;
-  margin-top: 30px;
-  padding: 0;
+  margin-top: 17px;
   list-style: none;
 }
 
 .suggestions button {
-  position: relative;
-  display: flex;
+  display: grid;
   width: 100%;
+  min-height: 112px;
   height: 100%;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 14px;
+  grid-template-columns: 1fr auto;
+  align-content: start;
+  align-items: start;
+  gap: 10px;
+  padding: 13px;
   border: 1px solid var(--ui-line);
-  border-radius: var(--ui-radius);
+  border-radius: 15px;
   background: var(--ui-surface);
-  color: var(--ui-primary);
-  text-align: left;
+  color: var(--ui-text);
+  text-align: start;
+  box-shadow: var(--chat-card-shadow);
 }
+
+.suggestionIcon {
+  display: grid;
+  width: 33px;
+  height: 33px;
+  place-items: center;
+  border-radius: 9px;
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.suggestionArrow {
+  align-self: center;
+  color: var(--ui-muted);
+}
+
+.suggestionCopy {
+  display: grid;
+  grid-column: 1 / -1;
+  gap: 3px;
+}
+
+.suggestionCopy strong { font-size: 0.875rem; font-weight: 710; line-height: 1.3; }
+.suggestionCopy > span { color: var(--ui-muted); font-size: 0.8125rem; line-height: 1.42; }
 
 .suggestions button:hover:not(:disabled) {
   border-color: var(--ui-focus);
@@ -233,42 +347,21 @@
   opacity: 0.64;
 }
 
-.suggestions strong,
-.suggestions button span span {
-  display: block;
-}
-
-.suggestions strong {
-  margin-bottom: 2px;
-  color: var(--ui-text);
-  font-size: 0.875rem;
-  font-weight: 650;
-}
-
-.suggestions button span span {
-  color: var(--ui-muted);
-  font-size: 0.8125rem;
-  line-height: 1.45;
-}
-
-.suggestionArrow {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  color: var(--ui-muted);
+.stage[data-empty='true'] .questionSuggestions {
+  margin-block: 14px 0;
 }
 
 .transcript {
   display: grid;
-  gap: 24px;
-  padding-block: 28px;
+  gap: 26px;
+  padding-block: 29px 23px;
 }
 
 .composerRegion {
   position: relative;
   flex: none;
   padding-top: 8px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  padding-bottom: max(12px, env(safe-area-inset-bottom));
 }
 
 .scrollButton {
@@ -311,6 +404,31 @@
   right: 8px;
 }
 
+@media (prefers-reduced-motion: no-preference) {
+  .emptyIntro { animation: workspace-arrive 540ms var(--chat-ease) both; }
+  .stage[data-empty='true'] .composerRegion > form { animation: workspace-arrive 460ms 60ms var(--chat-ease) both; }
+  .suggestions li { animation: workspace-arrive 500ms 125ms var(--chat-ease) both; }
+  .suggestions li:nth-child(2) { animation-delay: 175ms; }
+  .suggestions li:nth-child(3) { animation-delay: 225ms; }
+  .suggestions button { transition: border-color 170ms ease-out, background-color 170ms ease-out, transform 230ms var(--chat-ease); }
+  .suggestionArrow { transition: transform 230ms var(--chat-ease); }
+  .suggestions button:hover:not(:disabled) .suggestionArrow { transform: translate(2px, -2px); }
+  .suggestions button:active:not(:disabled) { transform: scale(0.98); }
+  .account summary > svg:last-child { transition: transform 230ms var(--chat-ease); }
+  .account[open] .accountOptions { animation: workspace-arrive 210ms var(--chat-ease) both; }
+  .drawer[open] { animation: drawer-in 310ms var(--chat-ease) both; }
+}
+
+@keyframes workspace-arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes drawer-in {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(0); }
+}
+
 @media (max-width: 1023px) {
   .workspace {
     grid-template-columns: minmax(0, 1fr);
@@ -346,42 +464,40 @@
     display: none;
   }
 
-  .empty,
   .transcript,
   .composerRegion {
     padding-inline: 14px;
   }
 
-  .empty {
-    padding-block: 24px;
+  .stage[data-empty='true'] .composerRegion {
+    padding-block: 27px 21px;
   }
 
   .emblem {
-    width: 50px;
-    height: 50px;
-    margin-bottom: 14px;
+    width: 53px;
+    height: 53px;
+    margin-bottom: 17px;
   }
 
+  .emblem::before { border-radius: 21px; }
+  .emblem::after { border-radius: 27px; }
+  .emptyIntro { margin-bottom: 17px; }
+
   .suggestions {
-    max-width: 450px;
     grid-template-columns: 1fr;
     gap: 7px;
-    margin-top: 18px;
+    margin-top: 12px;
   }
 
   .suggestions button {
-    min-height: 54px;
-    flex-direction: row;
+    min-height: 62px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     align-items: center;
-    padding: 8px 31px 8px 12px;
+    gap: 8px;
+    padding: 8px 10px;
+    border-radius: 12px;
   }
 
-  .suggestions button svg {
-    flex: none;
-  }
-
-  .suggestionArrow {
-    top: 12px;
-    right: 9px;
-  }
+  .suggestionCopy { grid-area: 1 / 2; }
+  .suggestionArrow { grid-area: 1 / 3; }
 }

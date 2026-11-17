@@ -1,15 +1,15 @@
 'use client'
 
 import { useState } from 'react'
-import { motion } from 'framer-motion'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import SimpleBackground from '@/components/3d/SimpleBackground'
+import AuthPageLayout from '@/components/auth/AuthPageLayout'
 import LoginForm from '@/components/auth/LoginForm'
 import OTPVerification from '@/components/auth/OTPVerification'
-import Button from '@/components/ui/Button'
-import { ArrowLeft, Shield } from 'lucide-react'
+import { Check, LockKeyhole, MailCheck } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { requestOtp } from '@/services/otp'
+import styles from '../public-site.module.css'
 
 export default function LoginPage() {
   const router = useRouter()
@@ -43,82 +43,26 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="relative min-h-screen flex items-center justify-center p-4 bg-gradient-to-b from-dark-bg via-dark-bg/90 to-dark-bg">
-      {/* Animated Canvas Background */}
-      <SimpleBackground />
-
-      {/* Glassmorphism Card */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.9 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ duration: 0.7 }}
-        className="relative z-10 w-full max-w-2xl mx-4 sm:mx-6"
-      >
-        <div className="glass-effect rounded-3xl overflow-hidden">
-          {/* Header with gradient */}
-          <div className="bg-gradient-to-r from-primary-800 to-secondary-800 p-8">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-sm flex items-center justify-center">
-                  <Shield className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-white">
-                    Legal AI Enterprise
-                  </h1>
-                  <p className="text-gray-200 text-sm">
-                    Hệ thống chatbot pháp lý nội bộ
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 rounded-full bg-white/30" />
-                <div className="w-2 h-2 rounded-full bg-white/60" />
-                <div className="w-2 h-2 rounded-full bg-white" />
-              </div>
-            </div>
-          </div>
-
-          {/* Main Content */}
-          <div className="p-8">
-            {!showOTP ? (
-              <LoginForm
-                onLoginSuccess={handleLoginSuccess}
-                onShowOTP={handleLoginSuccess}
-              />
-            ) : (
-              <OTPVerification
-                email={userEmail}
-                onVerify={handleVerifyOTP}
-                onResendCode={handleResendCode}
-                onBack={handleOTPBack}
-              />
-            )}
-          </div>
-
-          {/* Footer */}
-          <div className="p-6 border-t border-dark-border">
-            <div className="flex items-center justify-between">
-              <Button
-                variant="ghost"
-                onClick={() => router.push('/')}
-                icon={<ArrowLeft className="w-4 h-4" />}
-              >
-                Trang chủ
-              </Button>
-
-              <div className="text-sm text-gray-400">
-                Phiên bản 1.0.0 • Bảo mật cấp doanh nghiệp
-              </div>
-            </div>
-          </div>
-        </div>
-      </motion.div>
-
-      {/* Decorative elements */}
-      <div className="absolute top-10 left-10 w-72 h-72 bg-gradient-to-r from-primary-500/10 to-secondary-500/10 rounded-full blur-3xl" />
-      <div className="absolute bottom-10 right-10 w-96 h-96 bg-gradient-to-r from-neon-cyan/5 to-neon-purple/5 rounded-full blur-3xl" />
-    </div>
+    <AuthPageLayout titleId="authentication-title">
+      <ol className={styles.loginProgress} role="list" aria-label="Các bước đăng nhập" data-step={showOTP ? 'email' : 'account'}>
+        <li aria-current={showOTP ? undefined : 'step'} data-complete={showOTP || undefined}>
+          {showOTP ? <Check size={16} aria-hidden="true" /> : <LockKeyhole size={15} aria-hidden="true" />} Tài khoản
+        </li>
+        <li aria-current={showOTP ? 'step' : undefined}><MailCheck size={16} aria-hidden="true" /> Mã xác thực</li>
+      </ol>
+      <div className={styles.loginStep} key={showOTP ? 'email' : 'account'} data-step={showOTP ? 'email' : 'account'}>
+        {!showOTP ? (
+          <LoginForm initialEmail={userEmail} onLoginSuccess={handleLoginSuccess} />
+        ) : (
+          <OTPVerification
+            email={userEmail}
+            onVerify={handleVerifyOTP}
+            onResendCode={handleResendCode}
+            onBack={handleOTPBack}
+          />
+        )}
+        {!showOTP && <p className={styles.loginSupport}>Chưa có tài khoản? <Link href="/register">Xem cách đăng ký</Link></p>}
+      </div>
+    </AuthPageLayout>
   )
 }

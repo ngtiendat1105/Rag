@@ -1,11 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import { AlertCircle, Check, ChevronDown, Copy, ExternalLink, FileText, RotateCcw, Scale, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, Check, ChevronRight, Copy, FileText, RotateCcw, ThumbsDown, ThumbsUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import DislikeFeedbackModal from '@/components/chat/DislikeFeedbackModal'
-import DocumentViewer from '@/components/chat/DocumentViewer'
+import BrandMark from '@/components/tuan/ui/BrandMark'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ChatAttachment, ChatReference } from '@/store/chatStore'
 import { formatDate } from '@/utils/formatters'
@@ -13,6 +13,7 @@ import theme from '@/components/tuan/ui/theme.module.css'
 import styles from './chat.module.css'
 
 interface Props {
+  id: string
   role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
@@ -20,6 +21,8 @@ interface Props {
   references?: Array<string | ChatReference>
   attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
+  selectedReferenceIndex?: number
+  onSelectReference: (reference: ChatReference, index: number, trigger: HTMLButtonElement) => void
   onRate: (rating: 'like' | 'dislike', reason: string, detail?: string) => Promise<void>
   onRetry?: () => void
   retryLabel?: string
@@ -29,7 +32,8 @@ interface Props {
 const likeReasons = ['Đúng và hữu ích', 'Nguồn rõ ràng', 'Dễ hiểu', 'Đúng nhu cầu']
 
 export default function ChatMessage({
-  role, content, timestamp, status = 'sent', references = [], attachments = [], rating, onRate,
+  id, role, content, timestamp, status = 'sent', references = [], attachments = [], rating,
+  selectedReferenceIndex, onSelectReference, onRate,
   onRetry, retryLabel = 'Thử lại câu hỏi', retryDisabled,
 }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
@@ -37,7 +41,7 @@ export default function ChatMessage({
   const [showDislikeForm, setShowDislikeForm] = useState(false)
   const [submittingLike, setSubmittingLike] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
-  const [viewerReference, setViewerReference] = useState<ChatReference | null>(null)
+  const dislikeTrigger = useRef<HTMLButtonElement>(null)
   const { showToast } = useToast()
   const isUser = role === 'user'
   const isAssistant = role === 'assistant'
@@ -58,20 +62,6 @@ export default function ChatMessage({
     }
   }
 
-  async function copyReference(reference: ChatReference) {
-    const citation = [
-      reference.title,
-      reference.page ? `Trang ${reference.page}` : '',
-      reference.excerpt,
-    ].filter(Boolean).join(' — ')
-    try {
-      await navigator.clipboard.writeText(citation)
-      showToast('Đã sao chép nguồn tham khảo.')
-    } catch {
-      showToast('Không thể sao chép nguồn tham khảo.', 'info')
-    }
-  }
-
   async function submitLike(reason: string) {
     setSubmittingLike(true)
     setFeedbackError('')
@@ -87,11 +77,11 @@ export default function ChatMessage({
   }
 
   return (
-    <article className={styles.message} data-role={role}>
+    <article className={styles.message} data-role={role} data-message-id={id}>
       {!isUser && (
-        <div className={styles.assistantIcon}>
-          {status === 'error' ? <AlertCircle size={18} aria-hidden="true" /> : <Scale size={18} aria-hidden="true" />}
-        </div>
+        status === 'error'
+          ? <div className={styles.assistantIcon}><AlertCircle size={18} aria-hidden="true" /></div>
+          : <BrandMark className={styles.assistantMark} size={34} />
       )}
       <div className={styles.messageBody}>
         <div className={styles.messageMeta}>
@@ -115,50 +105,48 @@ export default function ChatMessage({
           {showActions && references.length > 0 && (
             <div className={styles.references}>
               <p>Nguồn tham chiếu ({references.length})</p>
-              {references.map((reference, index) => {
-                const item = typeof reference === 'string' ? { title: reference } : reference
-                return (
-                  <details className={styles.reference} key={`${item.title}-${index}`}>
-                    <summary>
-                      <FileText size={16} aria-hidden="true" />
-                      <span>{item.title}{item.page ? ` · Trang ${item.page}` : ''}</span>
-                      <ChevronDown size={15} aria-hidden="true" />
-                    </summary>
-                    <p>{item.excerpt || 'Chưa có thông tin chi tiết cho nguồn này.'}</p>
-                    <div className={styles.referenceActions}>
-                      <button type="button" className={theme.actionButton} onClick={() => void copyReference(item)}>
-                        <Copy size={16} aria-hidden="true" /> Sao chép nguồn
+              <ul aria-label="Tài liệu trích dẫn">
+                {references.map((reference, index) => {
+                  const item = typeof reference === 'string' ? { title: reference } : reference
+                  return (
+                    <li key={`${item.title}-${index}`}>
+                      <button type="button" className={styles.reference} aria-pressed={selectedReferenceIndex === index}
+                        aria-label={item.page ? `${item.title} · Trang ${item.page}` : item.title}
+                        onClick={event => onSelectReference(item, index, event.currentTarget)}>
+                        <span className={styles.referenceIcon}><FileText size={17} aria-hidden="true" /></span>
+                        <span className={styles.referenceCopy}>
+                          <strong>{item.title}</strong>
+                          {item.page && <small>Trang {item.page}</small>}
+                        </span>
+                        <ChevronRight className={styles.referenceArrow} size={16} aria-hidden="true" />
                       </button>
-                      {item.previewUrl && (
-                        <button type="button" className={theme.actionButton} onClick={() => setViewerReference(item)}>
-                          <ExternalLink size={16} aria-hidden="true" /> Xem tài liệu
-                        </button>
-                      )}
-                    </div>
-                  </details>
-                )
-              })}
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
           )}
         </div>
 
         {showActions && (
           <div className={styles.messageActions}>
-            <button type="button" className={theme.iconButton} onClick={copyMessage} title="Sao chép tin nhắn" aria-label="Sao chép tin nhắn">
-              {copyStatus === 'copied' ? <Check size={17} aria-hidden="true" /> : <Copy size={17} aria-hidden="true" />}
-            </button>
-            <button type="button" className={theme.iconButton} onClick={() => {
-              setShowLikeReasons(!showLikeReasons)
-              setFeedbackError('')
-            }} title="Câu trả lời hữu ích" aria-label="Câu trả lời hữu ích" aria-pressed={rating === 'like'} aria-expanded={showLikeReasons} disabled={submittingLike}>
-              <ThumbsUp size={17} aria-hidden="true" />
-            </button>
-            <button type="button" className={theme.iconButton} onClick={() => {
-              setShowLikeReasons(false)
-              setShowDislikeForm(true)
-            }} title="Câu trả lời chưa hữu ích" aria-label="Câu trả lời chưa hữu ích" aria-pressed={rating === 'dislike'} aria-haspopup="dialog" disabled={submittingLike}>
-              <ThumbsDown size={17} aria-hidden="true" />
-            </button>
+            <div className={styles.messageTools} role="group" aria-label="Thao tác với câu trả lời">
+              <button type="button" className={theme.iconButton} onClick={copyMessage} title="Sao chép tin nhắn" aria-label="Sao chép tin nhắn">
+                {copyStatus === 'copied' ? <Check className={styles.copiedIcon} size={17} aria-hidden="true" /> : <Copy size={17} aria-hidden="true" />}
+              </button>
+              <button type="button" className={theme.iconButton} onClick={() => {
+                setShowLikeReasons(!showLikeReasons)
+                setFeedbackError('')
+              }} title="Câu trả lời hữu ích" aria-label="Câu trả lời hữu ích" aria-pressed={rating === 'like'} aria-expanded={showLikeReasons} disabled={submittingLike}>
+                <ThumbsUp size={17} aria-hidden="true" />
+              </button>
+              <button ref={dislikeTrigger} type="button" className={`${theme.iconButton} ${styles.negativeAction}`} onClick={() => {
+                setShowLikeReasons(false)
+                setShowDislikeForm(true)
+              }} title="Câu trả lời chưa hữu ích" aria-label="Câu trả lời chưa hữu ích" aria-pressed={rating === 'dislike'} aria-haspopup="dialog" disabled={submittingLike}>
+                <ThumbsDown size={17} aria-hidden="true" />
+              </button>
+            </div>
             <span role="status">
               {copyStatus === 'copied' && 'Đã sao chép'}
               {copyStatus === 'error' && 'Không thể sao chép'}
@@ -185,12 +173,14 @@ export default function ChatMessage({
         )}
       </div>
       {showDislikeForm && (
-        <DislikeFeedbackModal open onClose={() => setShowDislikeForm(false)} onSubmit={async (reason, detail) => {
+        <DislikeFeedbackModal onClose={() => {
+          setShowDislikeForm(false)
+          dislikeTrigger.current?.focus()
+        }} onSubmit={async (reason, detail) => {
           await onRate('dislike', reason, detail)
           showToast('Đã ghi nhận phản hồi cải thiện.')
         }} />
       )}
-      <DocumentViewer reference={viewerReference} onClose={() => setViewerReference(null)} />
     </article>
   )
 }

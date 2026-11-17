@@ -1,0 +1,173 @@
+.form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.heading {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 3px;
+}
+
+.heading h1 {
+  font-size: clamp(2rem, 3.7vw, 2.85rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+}
+
+.heading p,
+.hint {
+  color: var(--ui-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+  overflow-wrap: anywhere;
+}
+
+.heading strong { color: var(--ui-text); font-weight: 650; }
+
+.field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+.field > label {
+  width: fit-content;
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.control {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 52px;
+  padding-inline: 12px 4px;
+  border: 1px solid #bac8db;
+  border-radius: 12px;
+  background: #f8fafc;
+  color: var(--ui-muted);
+}
+
+.control:focus-within {
+  border-color: var(--ui-focus);
+  box-shadow: 0 0 0 2px var(--ui-selected);
+  background: var(--ui-surface);
+}
+
+.control > svg { flex: none; color: var(--ui-primary); }
+
+.control input {
+  flex: 1;
+  min-width: 0;
+  min-height: 46px;
+  padding-inline-end: 5px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 1rem;
+}
+
+.control input:focus-visible { outline: none; }
+.control input::placeholder { color: #617087; }
+.control input:disabled { opacity: 0.7; }
+.control button { outline-offset: -1px; }
+.control :global(input::-ms-reveal) { display: none; }
+
+.control .otp {
+  font-size: 1.25rem;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.32em;
+}
+
+.forgot {
+  display: inline-flex;
+  align-items: center;
+  justify-self: end;
+  min-height: 30px;
+  margin-top: -6px;
+  border-radius: 4px;
+  color: var(--ui-primary);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.forgot:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.error {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: var(--ui-danger-surface);
+  color: var(--ui-danger);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.submit {
+  position: relative;
+  isolation: isolate;
+  overflow: clip;
+  min-height: 52px;
+  border-radius: 12px;
+  font-size: 0.9375rem;
+}
+
+.submit:not(:disabled) {
+  background: var(--auth-action);
+  box-shadow: 0 9px 15px -9px #244a89;
+}
+
+.submit:hover:not(:disabled) { background: var(--auth-action-hover); }
+
+.submitGlyph {
+  display: grid;
+  width: 26px;
+  height: 26px;
+  place-items: center;
+  border-radius: 7px;
+  background: rgb(244 221 187 / 14%);
+  color: #f3ddba;
+}
+
+.otpActions {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+}
+
+.otpActions button:disabled {
+  background: transparent;
+  color: var(--ui-muted);
+  cursor: not-allowed;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .control { transition: border-color 150ms ease-out, background-color 150ms ease-out, box-shadow 150ms ease-out; }
+  .submit { transition: transform 150ms ease-out, background-color 150ms ease-out; }
+  .submit:active:not(:disabled) { transform: scale(0.985); }
+  .submit:not(:disabled) svg { transition: transform 240ms cubic-bezier(0.22, 1, 0.36, 1); }
+  .submit:hover:not(:disabled) svg { transform: translateX(3px); }
+  .submit[aria-busy='true']::after {
+    position: absolute;
+    inset: auto 0 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #4777b7, transparent);
+    animation: pending 1s ease-in-out infinite alternate;
+    content: '';
+  }
+  .spinner { animation: spin 900ms linear infinite; }
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pending {
+  from { transform: translateX(-55%); }
+  to { transform: translateX(55%); }
+}
