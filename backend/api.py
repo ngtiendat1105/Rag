@@ -1,6 +1,7 @@
 import logging
 import os
 import secrets
+import sys
 import threading
 import time
 from pathlib import Path
@@ -8,12 +9,18 @@ from collections import defaultdict, deque
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, File, Header, HTTPException, Request, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
 
 load_dotenv(Path(__file__).resolve().parents[1] / '.env.local')
+
+for _stream in (sys.stdout, sys.stderr):
+    try:
+        _stream.reconfigure(encoding="utf-8", errors="replace")
+    except AttributeError:
+        pass
 
 if TYPE_CHECKING:
     from rag_pipeline import RAGPipeline
@@ -41,6 +48,7 @@ RATE_LIMIT = int(os.getenv("LEGALAI_RATE_LIMIT", "20"))
 RATE_WINDOW_SECONDS = int(os.getenv("LEGALAI_RATE_WINDOW_SECONDS", "60"))
 _requests = defaultdict(deque)
 _rate_lock = threading.Lock()
+_reindex_lock = threading.Lock()
 
 
 class ChatRequest(BaseModel):
@@ -102,6 +110,47 @@ def enforce_rate_limit(request: Request) -> None:
 @app.get("/health")
 def health_check():
     return {"status": "ok", "service": "legalai-rag"}
+
+
+def _release_cached_pipeline() -> None:
+    if get_pipeline.cache_info().currsize == 0:
+        return
+    pipeline = get_pipeline()
+    client = getattr(getattr(pipeline, "retriever_service", None), "qdrant_client", None)
+    close = getattr(client, "close", None)
+    if callable(close):
+        close()
+    get_pipeline.cache_clear()
+
+
+@app.post("/api/documents/ingest")
+def ingest_document(
+    file: UploadFile = File(...),
+    _: None = Depends(require_api_key),
+):
+    """Save an uploaded document and rebuild the local knowledge index."""
+    from config import UPLOAD_DIR
+    from sync_documents import build_knowledge_base, rebuild_index
+
+    suffix = Path(file.filename or "").suffix.lower()
+    if suffix not in {".md", ".markdown", ".docx", ".pdf", ".png", ".jpg", ".jpeg", ".tif", ".tiff"}:
+        raise HTTPException(status_code=400, detail="Định dạng tài liệu không được hỗ trợ")
+
+    safe_name = Path(file.filename or "document").name
+    target = UPLOAD_DIR / safe_name
+    try:
+        target.write_bytes(file.file.read())
+        with _reindex_lock:
+            _release_cached_pipeline()
+            count, errors = build_knowledge_base()
+            if errors:
+                raise RuntimeError("; ".join(errors))
+            rebuild_index()
+            get_pipeline.cache_clear()
+        return {"status": "indexed", "file": safe_name, "chunks": count}
+    except Exception as exc:
+        logger.exception("Document ingestion failed for %s", safe_name)
+        raise HTTPException(status_code=503, detail=f"File đã nhận nhưng chưa lập chỉ mục: {exc}") from exc
 
 
 @app.post("/api/chat", response_model=ChatResponse)

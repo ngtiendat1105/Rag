@@ -39,6 +39,7 @@ export default function ChatMessage({
   const [showDislikeForm, setShowDislikeForm] = useState(false)
   const [submittingLike, setSubmittingLike] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
+  const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const { showToast } = useToast()
   const isUser = role === 'user'
   const isAssistant = role === 'assistant'
@@ -65,6 +66,7 @@ export default function ChatMessage({
     try {
       await onRate('like', reason)
       setShowLikeReasons(false)
+      setFeedbackSubmitted(true)
       showToast('Đã ghi nhận đánh giá của bạn.')
     } catch (error) {
       setFeedbackError(error instanceof Error ? error.message : 'Không thể gửi phản hồi.')
@@ -157,6 +159,9 @@ export default function ChatMessage({
             {feedbackError && <p role="alert">{feedbackError}</p>}
           </div>
         )}
+        {feedbackSubmitted && (
+          <p className={styles.feedbackSuccess} role="status">Cảm ơn bạn đã đánh giá.</p>
+        )}
         {onRetry && (
           <button type="button" className={theme.actionButton} disabled={retryDisabled} onClick={onRetry}>
             <RotateCcw size={16} aria-hidden="true" /> {retryLabel}
@@ -166,6 +171,7 @@ export default function ChatMessage({
       {showDislikeForm && (
         <DislikeFeedbackModal open onClose={() => setShowDislikeForm(false)} onSubmit={async (reason, detail) => {
           await onRate('dislike', reason, detail)
+          setFeedbackSubmitted(true)
           showToast('Đã ghi nhận phản hồi cải thiện.')
         }} />
       )}

@@ -516,7 +516,23 @@ class LegalRetrieverService:
             else:
                 hits.sort(key=ranking_score, reverse=True)
 
-            hits = hits[:final_k]
+            # A document can be indexed more than once after Storage uploads.
+            # Keep one copy of each logical chunk so duplicates do not crowd
+            # out the most relevant passages.
+            unique_hits = []
+            seen_chunks = set()
+            for hit in hits:
+                payload = hit.payload or {}
+                metadata = payload.get("metadata", {}) or {}
+                chunk_key = (
+                    metadata.get("source_file", ""),
+                    metadata.get("chunk_id", payload.get("chunk_id", "")),
+                )
+                if chunk_key in seen_chunks:
+                    continue
+                seen_chunks.add(chunk_key)
+                unique_hits.append(hit)
+            hits = unique_hits[:final_k]
 
             for hit in hits:
                 payload = hit.payload or {}

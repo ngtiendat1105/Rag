@@ -4,6 +4,7 @@ Module này tạo pipeline RAG hoàn chỉnh tích hợp retrieval, context chec
 """
 import logging
 import os
+import re
 import time
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.output_parsers import StrOutputParser
@@ -142,6 +143,44 @@ TRẢ LỜI:"""
                 if not retryable or attempt == attempts - 1:
                     raise
                 time.sleep(LLM_RETRY_BACKOFF_SECONDS * (2 ** attempt))
+
+    @staticmethod
+    def _extractive_evidence_answer(question: str, documents: List[Any]) -> str:
+        """Return useful evidence when the model gives a false empty-context refusal."""
+        from query_understanding import fold_text
+
+        stop_words = {"thẩm", "quyền", "giải", "quyết", "khi", "nào", "của", "và"}
+        terms = {
+            term for term in re.findall(r"\w+", fold_text(question))
+            if len(term) > 2 and term not in stop_words
+        }
+        candidates = []
+        for document in documents:
+            for sentence in re.split(r"(?<=[.!?])\s+|\n+", document.page_content):
+                sentence = sentence.strip(" -•")
+                if len(sentence) < 30:
+                    continue
+                score = sum(term in fold_text(sentence) for term in terms)
+                if score:
+                    candidates.append((score, sentence))
+        candidates.sort(key=lambda item: (-item[0], -len(item[1])))
+        selected = []
+        seen = set()
+        for _, sentence in candidates:
+            key = fold_text(sentence)
+            if key in seen:
+                continue
+            seen.add(key)
+            selected.append(sentence)
+            if len(selected) == 4:
+                break
+        if not selected:
+            return INSUFFICIENT_EVIDENCE_RESPONSE
+        return (
+            "Theo các tài liệu tham khảo, nội dung liên quan được ghi nhận như sau:\n"
+            + "\n".join(f"- {sentence}" for sentence in selected)
+            + f"\n\n{LEGAL_DISCLAIMER}"
+        )
     
     def _check_warning_required(self, documents: List[Dict[str, Any]]) -> bool:
         """
@@ -205,6 +244,8 @@ TRẢ LỜI:"""
                 )
             else:
                 answer = self._invoke_with_retry(self._build_prompt(question, raw_docs))
+                if INSUFFICIENT_EVIDENCE_RESPONSE.lower() in answer.lower():
+                    answer = self._extractive_evidence_answer(question, raw_docs)
             
             # Extract sources từ documents
             sources = []

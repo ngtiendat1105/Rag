@@ -66,7 +66,7 @@ class VietnameseEmbedder:
         """Khởi tạo và tải model sentence-transformers"""
         try:
             if VERBOSE_LOGGING:
-                print(f"🔄 Đang tải model embedding: {self.model_name}")
+                print(f"[INFO] Dang tai model embedding: {self.model_name}")
                 print(f"   Device: {self.device}")
                 print(f"   Expected dimension: {self.embedding_dimension}")
             
@@ -84,14 +84,14 @@ class VietnameseEmbedder:
             actual_dimension = self.model.get_sentence_embedding_dimension()
             
             if actual_dimension != self.embedding_dimension:
-                print(f"⚠️ Dimension mismatch: config={self.embedding_dimension}, actual={actual_dimension}")
+                print(f"[WARN] Dimension mismatch: config={self.embedding_dimension}, actual={actual_dimension}")
                 print(f"   Cập nhật EMBEDDING_DIMENSION trong config_phase2.py")
                 self.embedding_dimension = actual_dimension
             
             load_time = time.time() - start_time
             
             if VERBOSE_LOGGING:
-                print(f"✅ Model loaded successfully in {load_time:.2f}s")
+                print(f"[OK] Model loaded successfully in {load_time:.2f}s")
                 print(f"   Actual embedding dimension: {self.embedding_dimension}")
                 print(f"   Model info: {self.model}")
             
@@ -99,8 +99,8 @@ class VietnameseEmbedder:
             error_msg = f"Không thể tải model {self.model_name}: {str(e)}"
             
             # Gợi ý các model thay thế
-            print(f"❌ {error_msg}")
-            print("\n💡 Gợi ý các model thay thế:")
+            print(f"[ERROR] {error_msg}")
+            print("\n[HINT] Goi y cac model thay the:")
             print("   1. 'sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2' (384 dimensions)")
             print("   2. 'sentence-transformers/paraphrase-multilingual-mpnet-base-v2' (768 dimensions)")
             print("   3. 'intfloat/multilingual-e5-small' (384 dimensions)")

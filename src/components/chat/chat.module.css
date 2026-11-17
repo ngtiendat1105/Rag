@@ -534,6 +534,12 @@
   color: var(--ui-danger);
 }
 
+.feedbackSuccess {
+  margin-top: 6px;
+  color: #34d399;
+  font-size: 0.75rem;
+}
+
 .messageActions {
   display: flex;
   align-items: center;
