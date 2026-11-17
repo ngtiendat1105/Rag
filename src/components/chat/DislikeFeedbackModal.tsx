@@ -1,38 +1,120 @@
 'use client'
 
-import { useState } from 'react'
-import { X } from 'lucide-react'
+import { useId, useRef, useState, type FormEvent } from 'react'
+import { AlertCircle, FileSearch, Loader2, MessageSquare, Scale, Send, ThumbsDown } from 'lucide-react'
+import ChatDialog from '@/components/tuan/ui/ChatDialog'
+import theme from '@/components/tuan/ui/theme.module.css'
+import styles from './dislikeFeedback.module.css'
 
 interface Props {
-  open: boolean
   onClose: () => void
   onSubmit: (reason: string, detail: string) => Promise<void>
 }
 
-const reasons = ['Sai luật', 'Trích dẫn sai', 'Tối nghĩa']
+const reasons = [
+  { label: 'Sai luật', description: 'Diễn giải hoặc áp dụng quy định chưa đúng.', icon: Scale },
+  { label: 'Trích dẫn sai', description: 'Dẫn nhầm nguồn hoặc trích sai nội dung.', icon: FileSearch },
+  { label: 'Tối nghĩa', description: 'Câu trả lời khó hiểu hoặc thiếu rõ ràng.', icon: MessageSquare },
+]
+const maxDetail = 2000
 
-export default function DislikeFeedbackModal({ open, onClose, onSubmit }: Props) {
+export default function DislikeFeedbackModal({ onClose, onSubmit }: Props) {
+  const id = useId()
+  const firstReason = useRef<HTMLInputElement>(null)
   const [reason, setReason] = useState('')
   const [detail, setDetail] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
-  if (!open) return null
 
-  const submit = async () => {
-    if (!reason) { setError('Vui lòng chọn một lý do.'); return }
-    setSubmitting(true); setError('')
-    try { await onSubmit(reason, detail.trim()); setReason(''); setDetail(''); onClose() }
-    catch (cause) { setError(cause instanceof Error ? cause.message : 'Không thể gửi phản hồi.') }
-    finally { setSubmitting(false) }
+  async function submit(event: FormEvent<HTMLFormElement>, dismiss: () => void) {
+    event.preventDefault()
+    if (submitting) return
+    if (!reason) {
+      setError('Vui lòng chọn một lý do.')
+      firstReason.current?.focus()
+      return
+    }
+    setSubmitting(true)
+    setError('')
+    try {
+      await onSubmit(reason, detail.trim())
+      dismiss()
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Không thể gửi phản hồi.')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
-  return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/40 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="dislike-title">
-    <div className="w-full max-w-md rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl">
-      <div className="flex items-start justify-between gap-4"><div><h2 id="dislike-title" className="text-base font-semibold text-slate-900">Cải thiện câu trả lời</h2><p className="mt-1 text-sm text-slate-500">Phản hồi này được dùng để đánh giá chất lượng RAG.</p></div><button onClick={onClose} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-700" aria-label="Đóng biểu mẫu"><X className="h-5 w-5" /></button></div>
-      <fieldset className="mt-5 space-y-3"><legend className="mb-2 text-sm font-medium text-slate-700">Lý do không hài lòng</legend>{reasons.map(item => <label key={item} className="flex cursor-pointer items-center gap-3 rounded-lg border border-slate-200 px-3 py-2.5 text-sm text-slate-700 hover:bg-slate-50"><input type="radio" name="dislike-reason" value={item} checked={reason === item} onChange={() => setReason(item)} className="h-4 w-4 accent-[#173f73]" />{item}</label>)}</fieldset>
-      <label className="mt-4 block text-sm font-medium text-slate-700">Chi tiết phản hồi <span className="font-normal text-slate-400">(không bắt buộc)</span><textarea value={detail} onChange={event => setDetail(event.target.value)} maxLength={2000} rows={4} placeholder="Mô tả điểm cần sửa..." className="mt-2 w-full resize-none rounded-xl border border-slate-200 px-3 py-2.5 text-sm outline-none focus:border-[#173f73]/50 focus:ring-4 focus:ring-[#173f73]/10" /></label>
-      {error && <p role="alert" className="mt-2 text-sm text-red-600">{error}</p>}
-      <div className="mt-5 flex justify-end gap-2"><button onClick={onClose} className="rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100">Hủy</button><button onClick={() => void submit()} disabled={submitting} className="rounded-xl bg-[#173f73] px-4 py-2 text-sm font-semibold text-white hover:bg-[#12345f] disabled:opacity-50">{submitting ? 'Đang gửi...' : 'Gửi phản hồi'}</button></div>
-    </div>
-  </div>
+  return (
+    <ChatDialog
+      title="Cải thiện câu trả lời"
+      description="Phản hồi của bạn giúp cải thiện chất lượng tra cứu."
+      icon={<ThumbsDown size={22} />}
+      closeLabel="Đóng biểu mẫu"
+      onClose={onClose}
+      className={styles.dialog}
+    >
+      {dismiss => (
+        <form className={styles.form} onSubmit={event => void submit(event, dismiss)}>
+          <div className={styles.body}>
+            <fieldset className={styles.reasons} disabled={submitting} aria-describedby={!reason && error ? `${id}-error` : undefined}>
+              <legend>Lý do phản hồi</legend>
+              {reasons.map(({ label, description, icon: Icon }, index) => {
+                const reasonId = `${id}-reason-${index}`
+                return (
+                  <label className={styles.reason} key={label}>
+                    <input
+                      ref={index === 0 ? firstReason : undefined}
+                      type="radio"
+                      name={`${id}-reason`}
+                      value={label}
+                      checked={reason === label}
+                      onChange={() => { setReason(label); setError('') }}
+                      aria-labelledby={reasonId}
+                      aria-describedby={`${reasonId}-description`}
+                    />
+                    <span className={styles.reasonIcon}><Icon size={18} aria-hidden="true" /></span>
+                    <span>
+                      <strong id={reasonId}>{label}</strong>
+                      <small id={`${reasonId}-description`}>{description}</small>
+                    </span>
+                  </label>
+                )
+              })}
+            </fieldset>
+
+            <div className={styles.detail}>
+              <label htmlFor={`${id}-detail`}>Chi tiết phản hồi <span>(không bắt buộc)</span></label>
+              <textarea
+                id={`${id}-detail`}
+                value={detail}
+                maxLength={maxDetail}
+                rows={3}
+                placeholder="Mô tả điểm cần sửa…"
+                disabled={submitting}
+                onChange={event => {
+                  setDetail(event.target.value)
+                  if (reason) setError('')
+                }}
+              />
+              <span className={styles.count} aria-hidden="true">{detail.length.toLocaleString('vi')}/{maxDetail.toLocaleString('vi')}</span>
+            </div>
+          </div>
+
+          <footer className={styles.footer}>
+            {error && <p id={`${id}-error`} className={styles.error} role="alert"><AlertCircle size={16} aria-hidden="true" /> {error}</p>}
+            <div className={styles.actions}>
+              <button type="button" className={theme.actionButton} onClick={dismiss}>Hủy</button>
+              <button type="submit" className={theme.primaryButton} disabled={submitting} aria-busy={submitting}>
+                {submitting
+                  ? <><Loader2 className={styles.spinner} size={16} aria-hidden="true" /> Đang gửi…</>
+                  : <><Send size={16} aria-hidden="true" /> Gửi phản hồi</>}
+              </button>
+            </div>
+          </footer>
+        </form>
+      )}
+    </ChatDialog>
+  )
 }

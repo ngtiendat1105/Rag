@@ -120,7 +120,7 @@ export default function ChatInput({ inputRef, value, onValueChange, onSendMessag
 
   return (
     <form onSubmit={handleSubmit}>
-      <div className={styles.composer} onDragEnter={startDrag} onDragOver={event => event.preventDefault()} onDragLeave={endDrag} onDrop={dropFiles}>
+      <div className={styles.composer} data-busy={isLoading} onDragEnter={startDrag} onDragOver={event => event.preventDefault()} onDragLeave={endDrag} onDrop={dropFiles}>
         {isDragging && <div className={styles.dragOverlay}>Thả tài liệu PDF, Word hoặc TXT vào đây</div>}
         {files.length > 0 && (
           <ul className={styles.selectedFiles} aria-label="Tệp đính kèm">
@@ -148,28 +148,28 @@ export default function ChatInput({ inputRef, value, onValueChange, onSendMessag
           readOnly={isBusy}
           aria-invalid={Boolean(errorMessage)}
           aria-describedby={errorMessage ? `${inputId}-error` : undefined}
-          placeholder="Nhập câu hỏi pháp lý hoặc quy định nội bộ…"
+          placeholder="Nhập câu hỏi pháp lý…"
           onKeyDown={handleKeyDown}
           onChange={event => { onValueChange(event.target.value); setError(null) }}
         />
         {errorMessage && <p id={`${inputId}-error`} role="alert" className={styles.composerError}>{errorMessage}</p>}
         <div className={styles.composerControls}>
-          <button type="button" className={theme.iconButton} aria-label="Đính kèm tài liệu" title="Đính kèm tài liệu" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
-            <Paperclip size={18} aria-hidden="true" />
+          <button type="button" className={`${theme.actionButton} ${styles.attachButton}`} aria-label="Đính kèm tài liệu" title="Đính kèm tài liệu" onClick={() => fileInputRef.current?.click()} disabled={isBusy}>
+            <Paperclip size={17} aria-hidden="true" /> <span>Đính kèm</span>
           </button>
           <input ref={fileInputRef} type="file" multiple accept=".pdf,.doc,.docx,.txt" hidden onChange={event => {
             addFiles(event.target.files)
             event.target.value = ''
           }} />
-          <span className={styles.keyboardHint}>Shift + Enter để xuống dòng</span>
+          <span className={styles.keyboardHint}><kbd>Shift</kbd> + <kbd>Enter</kbd> để xuống dòng</span>
           <span className={styles.characterCount}>{value.length.toLocaleString('vi')}/{MAX_QUESTION_LENGTH.toLocaleString('vi')}</span>
           {isLoading ? (
-            <button type="button" className={theme.actionButton} aria-label="Dừng xử lý câu hỏi" onClick={onCancel}>
-              <span>Dừng</span><Square size={15} aria-hidden="true" />
+            <button type="button" className={`${theme.actionButton} ${styles.stopButton}`} aria-label="Dừng xử lý câu hỏi" onClick={onCancel}>
+              <span>Dừng</span><span className={styles.composerGlyph}><Square size={12} fill="currentColor" aria-hidden="true" /></span>
             </button>
           ) : (
-            <button type="submit" className={theme.primaryButton} disabled={!canSend} aria-label="Gửi câu hỏi">
-              <span>Gửi</span><ArrowUp size={17} aria-hidden="true" />
+            <button type="submit" className={`${theme.primaryButton} ${styles.sendButton}`} disabled={!canSend} aria-label="Gửi câu hỏi">
+              <span>Gửi</span><span className={styles.composerGlyph}><ArrowUp size={17} aria-hidden="true" /></span>
             </button>
           )}
         </div>

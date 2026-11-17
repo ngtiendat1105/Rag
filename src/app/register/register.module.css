@@ -1,0 +1,107 @@
+.content {
+  display: grid;
+  gap: 25px;
+}
+
+.heading {
+  display: grid;
+  gap: 9px;
+}
+
+.heading h1 {
+  font-size: clamp(2rem, 3.7vw, 2.85rem);
+  font-weight: 750;
+  letter-spacing: -0.045em;
+  line-height: 1.15;
+}
+
+.heading p,
+.steps p,
+.actions p {
+  color: var(--ui-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.steps {
+  display: grid;
+  gap: 0;
+  padding: 2px 15px;
+  border: 1px solid var(--ui-line);
+  border-radius: 14px;
+  background: linear-gradient(160deg, #f0f4fa, #fbfcfe);
+}
+
+.steps li {
+  display: grid;
+  grid-template-columns: 33px minmax(0, 1fr);
+  align-items: start;
+  gap: 11px;
+  padding-block: 13px;
+}
+
+.steps li + li {
+  border-top: 1px solid var(--ui-line);
+}
+
+.stepNumber {
+  display: grid;
+  width: 33px;
+  height: 33px;
+  place-items: center;
+  border: 1px solid #e4cbab;
+  border-radius: 9px;
+  background: #f8e9d2;
+  color: #654418;
+  font-size: 0.8125rem;
+  font-weight: 750;
+}
+
+.steps h2 {
+  padding-block: 4px 3px;
+  font-size: 0.9375rem;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 9px 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--ui-line);
+}
+
+.loginLink {
+  min-height: 48px;
+  background: var(--auth-action);
+  box-shadow: 0 8px 14px -11px #274c80;
+}
+
+.actions .loginLink:hover {
+  background: var(--auth-action-hover);
+}
+
+.loginLink svg { color: #f3ddba; }
+
+@media (prefers-reduced-motion: no-preference) {
+  .steps li {
+    animation: step-in 420ms var(--public-ease) both;
+  }
+
+  .steps li:nth-child(2) { animation-delay: 70ms; }
+  .steps li:nth-child(3) { animation-delay: 140ms; }
+}
+
+@keyframes step-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@media (max-width: 720px) {
+  .content { gap: 21px; }
+  .steps { padding-inline: 11px; }
+  .steps li { gap: 8px; padding-block: 10px; }
+}

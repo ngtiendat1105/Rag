@@ -5,17 +5,14 @@ import Link from 'next/link'
 import {
   Archive,
   ArrowDown,
+  ArrowUpRight,
   BookOpen,
   Briefcase,
   ChevronDown,
-  Copy,
   Download,
   FileText,
   LogOut,
-  Moon,
   PanelLeft,
-  Scale,
-  Sun,
   User as UserIcon,
   X,
 } from 'lucide-react'
@@ -25,27 +22,22 @@ import ChatMessage from '@/components/chat/ChatMessage'
 import DocumentViewer from '@/components/chat/DocumentViewer'
 import TypingIndicator from '@/components/chat/TypingIndicator'
 import SourceInspector from '@/components/tuan/sources/SourceInspector'
+import BrandMark from '@/components/tuan/ui/BrandMark'
+import ThemeSwitch from '@/components/tuan/ui/ThemeSwitch'
 import ConfirmDialog from '@/components/ui/ConfirmDialog'
-import Modal from '@/components/ui/Modal'
 import { useToast } from '@/components/ui/ToastProvider'
 import UserAvatar from '@/components/ui/UserAvatar'
 import type { User } from '@/store/authStore'
 import { useChatStore, type ChatAttachment, type ChatReference } from '@/store/chatStore'
 import theme from '@/components/tuan/ui/theme.module.css'
 import styles from './workspace.module.css'
+import ChatGuide from './ChatGuide'
 
 const suggestions = [
   { icon: Briefcase, label: 'Hợp đồng lao động', question: 'Cần lưu ý gì khi ký hợp đồng lao động?' },
   { icon: BookOpen, label: 'Nghỉ phép năm', question: 'Người lao động được nghỉ phép năm bao nhiêu ngày?' },
   { icon: FileText, label: 'Bảo hiểm xã hội', question: 'Mức đóng bảo hiểm xã hội được xác định như thế nào?' },
 ]
-
-const guide = `HƯỚNG DẪN SỬ DỤNG TRỢ LÝ PHÁP LÝ NỘI BỘ
-
-1. Đặt câu hỏi cụ thể, nêu số điều, tên văn bản hoặc phòng ban nếu bạn biết.
-2. Mở nguồn tham chiếu để đối chiếu câu trả lời với văn bản gốc.
-3. Lưu trữ, bỏ lưu trữ hoặc xuất hội thoại thành tệp .txt khi cần.
-4. Chọn Thử lại nếu dịch vụ gặp lỗi. Tránh gửi dữ liệu cá nhân hoặc thông tin mật không cần thiết.`
 
 function downloadText(content: string, name: string) {
   const url = URL.createObjectURL(new Blob(['\uFEFF', content], { type: 'text/plain;charset=utf-8' }))
@@ -87,6 +79,8 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
   const [previewing, setPreviewing] = useState(false)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
+  const visibleMessages = useRef<{ chatId: string | null; ids: Set<string> } | null>(null)
+  const accountRef = useRef<HTMLDetailsElement>(null)
   const drawerRef = useRef<HTMLDialogElement>(null)
   const sourceTriggerRef = useRef<HTMLButtonElement | null>(null)
   const activeChat = chats.find(chat => chat.id === activeChatId)
@@ -133,6 +127,24 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
     const transcript = transcriptRef.current
     if (transcript && nearBottom) transcript.scrollTop = transcript.scrollHeight
   }, [messages, waitingForReply, nearBottom])
+
+  useEffect(() => {
+    const previous = visibleMessages.current
+    visibleMessages.current = { chatId: activeChatId, ids: new Set(messages?.map(message => message.id)) }
+    const firstSend = previous?.chatId === null && messages?.length === 1 && waitingForReply
+    if (!previous || (previous.chatId !== activeChatId && !firstSend)) return
+    if (!window.matchMedia('(prefers-reduced-motion: no-preference)').matches) return
+
+    transcriptRef.current?.querySelectorAll<HTMLElement>('[data-message-id]').forEach(entry => {
+      const id = entry.dataset.messageId
+      if (!id || previous.ids.has(id)) return
+      const offset = entry.dataset.role === 'user' ? 8 : -8
+      entry.animate(
+        [{ opacity: 0.45, transform: `translate(${offset}px, 6px)` }, { opacity: 1, transform: 'translate(0, 0)' }],
+        { duration: 290, easing: 'cubic-bezier(0.22, 1, 0.36, 1)' },
+      )
+    })
+  }, [activeChatId, messages, waitingForReply])
 
   function applyTheme() {
     const next = appearance === 'dark' ? 'light' : 'dark'
@@ -192,15 +204,6 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
       return `${name}: ${message.content}`
     }).join('\n\n')
     downloadText(content, `legal-ai-${chat.id}.txt`)
-  }
-
-  async function copyGuide() {
-    try {
-      await navigator.clipboard.writeText(guide)
-      showToast('Đã sao chép hướng dẫn.')
-    } catch {
-      showToast('Không thể sao chép hướng dẫn.', 'info')
-    }
   }
 
   const sidebarProps = {
@@ -267,6 +270,7 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               </button>
             )}
             <details
+              ref={accountRef}
               className={styles.account}
               onBlur={event => {
                 if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.open = false
@@ -286,15 +290,15 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
                 <ChevronDown size={14} aria-hidden="true" />
               </summary>
               <div className={styles.accountOptions}>
-                <button type="button" className={theme.actionButton} onClick={applyTheme}>
-                  {appearance === 'dark' ? <Sun size={17} aria-hidden="true" /> : <Moon size={17} aria-hidden="true" />}
-                  {appearance === 'dark' ? 'Giao diện sáng' : 'Giao diện tối'}
-                </button>
+                <ThemeSwitch dark={appearance === 'dark'} onToggle={applyTheme} />
                 <Link className={theme.actionButton} href="/profile">
                   <UserIcon size={17} aria-hidden="true" />
                   Hồ sơ cá nhân
                 </Link>
-                <button type="button" className={theme.actionButton} onClick={() => setShowGuide(true)}>
+                <button type="button" className={theme.actionButton} aria-haspopup="dialog" onClick={() => {
+                  if (accountRef.current) accountRef.current.open = false
+                  setShowGuide(true)
+                }}>
                   <BookOpen size={17} aria-hidden="true" /> Hướng dẫn sử dụng
                 </button>
                 <button type="button" className={theme.actionButton} onClick={() => setConfirmLogout(true)}>
@@ -354,9 +358,9 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
           <div className={styles.composerRegion}>
             {!hasMessages && (
               <div className={styles.emptyIntro}>
-                <div className={styles.emblem}><Scale size={28} strokeWidth={1.75} aria-hidden="true" /></div>
+                <div className={styles.emblem}><BrandMark size={66} /></div>
                 <h1>Bạn muốn tra cứu gì?</h1>
-                <p>Hỏi về văn bản pháp luật hoặc quy định nội bộ.</p>
+                <p>Hỏi về pháp luật và quy định nội bộ. Mở nguồn tham chiếu để đối chiếu câu trả lời.</p>
               </div>
             )}
             {hasMessages && !nearBottom && (
@@ -376,12 +380,13 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
             />
             {!hasMessages && (
               <>
-                <ul className={styles.suggestions} aria-label="Chủ đề gợi ý">
+                <ul className={styles.suggestions} aria-label="Chủ đề gợi ý" role="list">
                   {suggestions.map(({ icon: Icon, label, question }) => (
                     <li key={label}>
                       <button type="button" title={question} onClick={() => fillDraft(question)} disabled={isTyping}>
-                        <Icon size={17} aria-hidden="true" />
-                        {label}
+                        <span className={styles.suggestionIcon}><Icon size={18} aria-hidden="true" /></span>
+                        <ArrowUpRight className={styles.suggestionArrow} size={16} aria-hidden="true" />
+                        <span className={styles.suggestionCopy}><strong>{label}</strong><span>{question}</span></span>
                       </button>
                     </li>
                   ))}
@@ -429,17 +434,13 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
         <ConfirmDialog isOpen title="Đăng xuất khỏi hệ thống?" message="Phiên làm việc hiện tại sẽ kết thúc trên thiết bị này." confirmLabel="Đăng xuất" onClose={() => setConfirmLogout(false)} onConfirm={onLogout} />
       )}
       {showGuide && (
-        <Modal isOpen title="Hướng dẫn sử dụng" tone="light" size="sm" onClose={() => setShowGuide(false)}>
-          <p className="max-h-[50dvh] overflow-auto whitespace-pre-line text-sm leading-relaxed">{guide}</p>
-          <div className="mt-4 flex flex-wrap gap-2 text-slate-700">
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => void copyGuide()}>
-              <Copy size={16} aria-hidden="true" /> Sao chép
-            </button>
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => downloadText(guide, 'huong-dan-su-dung-chatbot.txt')}>
-              <Download size={16} aria-hidden="true" /> Xuất hướng dẫn
-            </button>
-          </div>
-        </Modal>
+        <ChatGuide
+          onClose={() => {
+            setShowGuide(false)
+            accountRef.current?.querySelector('summary')?.focus()
+          }}
+          onDownload={text => downloadText(text, 'huong-dan-su-dung-chatbot.txt')}
+        />
       )}
     </main>
   )

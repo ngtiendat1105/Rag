@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <title>Legal AI</title>
+  <rect x="0.5" y="0.5" width="63" height="63" rx="15.5" fill="#101E36" stroke="#365277"/>
+  <path d="M18 14h13v12h-3v16h18v8H18z" fill="#F8F3E8"/>
+  <path d="m34 14 12 12H34z" fill="#D9B47A"/>
+</svg>

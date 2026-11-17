@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useId, useRef, useState, useSyncExternalStore } from 'react'
-import { Copy, ExternalLink, FileText, X } from 'lucide-react'
+import { BookOpen, Copy, ExternalLink, FileText, X } from 'lucide-react'
 import type { ChatReference } from '@/store/chatStore'
 import theme from '@/components/tuan/ui/theme.module.css'
 import styles from './sourceInspector.module.css'
@@ -71,7 +71,7 @@ export default function SourceInspector({ reference, previewing, onPreview, onCl
   const panel = (
     <div className={styles.panel}>
       <header className={styles.header}>
-        <h2 id={titleId}>Nguồn tham chiếu</h2>
+        <h2 id={titleId}><BookOpen size={17} aria-hidden="true" /> Nguồn tham chiếu</h2>
         <button ref={closeRef} type="button" className={theme.iconButton} aria-label="Đóng nguồn tham chiếu" onClick={dismiss}>
           <X size={18} aria-hidden="true" />
         </button>
