@@ -1,26 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendOtp, verifyOtp } from '@/lib/otp'
 import { findUserByEmail, resetUserPassword } from '@/lib/supabaseUsers'
+import { isAllowedRequestOrigin } from '@/lib/requestOrigin'
 
 export const runtime = 'nodejs'
 
 const COOKIE_NAME = 'legal-password-reset'
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
-function isSameOrigin(request: NextRequest) {
-  const origin = request.headers.get('origin')
-  if (!origin) return false
-  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim()
-  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || 'https'
-  const host = request.headers.get('host')
-  const allowed = new Set([request.nextUrl.origin])
-  if (host) allowed.add(`${forwardedProto}://${host}`)
-  if (forwardedHost) allowed.add(`${forwardedProto}://${forwardedHost}`)
-  return allowed.has(origin)
-}
-
 export async function POST(request: NextRequest) {
-  if (!isSameOrigin(request)) {
+  if (!isAllowedRequestOrigin(request)) {
     return NextResponse.json({ message: 'Yêu cầu không hợp lệ.' }, { status: 403 })
   }
 

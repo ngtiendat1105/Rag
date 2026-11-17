@@ -132,6 +132,34 @@
   padding-inline: 28px;
 }
 
+.questionSuggestions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.questionSuggestions > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.questionSuggestions > div button {
+  max-width: min(100%, 320px);
+  flex: none;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+
+.questionSuggestions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .empty {
   display: flex;
   min-height: 100%;

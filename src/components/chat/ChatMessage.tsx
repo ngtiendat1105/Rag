@@ -1,9 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Check, ChevronDown, Copy, FileText, Scale, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { AlertCircle, Check, ChevronDown, Copy, ExternalLink, FileText, RotateCcw, Scale, ThumbsDown, ThumbsUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import DislikeFeedbackModal from '@/components/chat/DislikeFeedbackModal'
+import DocumentViewer from '@/components/chat/DocumentViewer'
+import { useToast } from '@/components/ui/ToastProvider'
 import type { ChatAttachment, ChatReference } from '@/store/chatStore'
 import { formatDate } from '@/utils/formatters'
 import theme from '@/components/tuan/ui/theme.module.css'
@@ -17,13 +20,25 @@ interface Props {
   references?: Array<string | ChatReference>
   attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
-  onRate: (rating: 'like' | 'dislike') => void
+  onRate: (rating: 'like' | 'dislike', reason: string, detail?: string) => Promise<void>
+  onRetry?: () => void
+  retryLabel?: string
+  retryDisabled?: boolean
 }
+
+const likeReasons = ['Đúng và hữu ích', 'Nguồn rõ ràng', 'Dễ hiểu', 'Đúng nhu cầu']
 
 export default function ChatMessage({
   role, content, timestamp, status = 'sent', references = [], attachments = [], rating, onRate,
+  onRetry, retryLabel = 'Thử lại câu hỏi', retryDisabled,
 }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
+  const [showLikeReasons, setShowLikeReasons] = useState(false)
+  const [showDislikeForm, setShowDislikeForm] = useState(false)
+  const [submittingLike, setSubmittingLike] = useState(false)
+  const [feedbackError, setFeedbackError] = useState('')
+  const [viewerReference, setViewerReference] = useState<ChatReference | null>(null)
+  const { showToast } = useToast()
   const isUser = role === 'user'
   const isAssistant = role === 'assistant'
   const showActions = isAssistant && status !== 'error'
@@ -40,6 +55,34 @@ export default function ChatMessage({
       setCopyStatus('copied')
     } catch {
       setCopyStatus('error')
+    }
+  }
+
+  async function copyReference(reference: ChatReference) {
+    const citation = [
+      reference.title,
+      reference.page ? `Trang ${reference.page}` : '',
+      reference.excerpt,
+    ].filter(Boolean).join(' — ')
+    try {
+      await navigator.clipboard.writeText(citation)
+      showToast('Đã sao chép nguồn tham khảo.')
+    } catch {
+      showToast('Không thể sao chép nguồn tham khảo.', 'info')
+    }
+  }
+
+  async function submitLike(reason: string) {
+    setSubmittingLike(true)
+    setFeedbackError('')
+    try {
+      await onRate('like', reason)
+      setShowLikeReasons(false)
+      showToast('Đã ghi nhận đánh giá của bạn.')
+    } catch (error) {
+      setFeedbackError(error instanceof Error ? error.message : 'Không thể gửi phản hồi.')
+    } finally {
+      setSubmittingLike(false)
     }
   }
 
@@ -82,6 +125,16 @@ export default function ChatMessage({
                       <ChevronDown size={15} aria-hidden="true" />
                     </summary>
                     <p>{item.excerpt || 'Chưa có thông tin chi tiết cho nguồn này.'}</p>
+                    <div className={styles.referenceActions}>
+                      <button type="button" className={theme.actionButton} onClick={() => void copyReference(item)}>
+                        <Copy size={16} aria-hidden="true" /> Sao chép nguồn
+                      </button>
+                      {item.previewUrl && (
+                        <button type="button" className={theme.actionButton} onClick={() => setViewerReference(item)}>
+                          <ExternalLink size={16} aria-hidden="true" /> Xem tài liệu
+                        </button>
+                      )}
+                    </div>
                   </details>
                 )
               })}
@@ -94,10 +147,16 @@ export default function ChatMessage({
             <button type="button" className={theme.iconButton} onClick={copyMessage} title="Sao chép tin nhắn" aria-label="Sao chép tin nhắn">
               {copyStatus === 'copied' ? <Check size={17} aria-hidden="true" /> : <Copy size={17} aria-hidden="true" />}
             </button>
-            <button type="button" className={theme.iconButton} onClick={() => onRate('like')} title="Câu trả lời hữu ích" aria-label="Câu trả lời hữu ích" aria-pressed={rating === 'like'}>
+            <button type="button" className={theme.iconButton} onClick={() => {
+              setShowLikeReasons(!showLikeReasons)
+              setFeedbackError('')
+            }} title="Câu trả lời hữu ích" aria-label="Câu trả lời hữu ích" aria-pressed={rating === 'like'} aria-expanded={showLikeReasons} disabled={submittingLike}>
               <ThumbsUp size={17} aria-hidden="true" />
             </button>
-            <button type="button" className={theme.iconButton} onClick={() => onRate('dislike')} title="Câu trả lời chưa hữu ích" aria-label="Câu trả lời chưa hữu ích" aria-pressed={rating === 'dislike'}>
+            <button type="button" className={theme.iconButton} onClick={() => {
+              setShowLikeReasons(false)
+              setShowDislikeForm(true)
+            }} title="Câu trả lời chưa hữu ích" aria-label="Câu trả lời chưa hữu ích" aria-pressed={rating === 'dislike'} aria-haspopup="dialog" disabled={submittingLike}>
               <ThumbsDown size={17} aria-hidden="true" />
             </button>
             <span role="status">
@@ -106,7 +165,32 @@ export default function ChatMessage({
             </span>
           </div>
         )}
+        {showLikeReasons && (
+          <div className={styles.feedback}>
+            <p>Điều gì làm câu trả lời hữu ích?</p>
+            <div className={styles.feedbackReasons}>
+              {likeReasons.map(reason => (
+                <button key={reason} type="button" className={theme.actionButton} disabled={submittingLike} onClick={() => void submitLike(reason)}>
+                  {reason}
+                </button>
+              ))}
+            </div>
+            {feedbackError && <p role="alert">{feedbackError}</p>}
+          </div>
+        )}
+        {onRetry && (
+          <button type="button" className={theme.actionButton} disabled={retryDisabled} onClick={onRetry}>
+            <RotateCcw size={16} aria-hidden="true" /> {retryLabel}
+          </button>
+        )}
       </div>
+      {showDislikeForm && (
+        <DislikeFeedbackModal open onClose={() => setShowDislikeForm(false)} onSubmit={async (reason, detail) => {
+          await onRate('dislike', reason, detail)
+          showToast('Đã ghi nhận phản hồi cải thiện.')
+        }} />
+      )}
+      <DocumentViewer reference={viewerReference} onClose={() => setViewerReference(null)} />
     </article>
   )
 }

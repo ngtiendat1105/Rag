@@ -3,6 +3,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { Database, FileText, RefreshCw, Search, Upload, Trash2 } from 'lucide-react'
 import AdminPageShell from '@/components/admin/AdminPageShell'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 const initialDocs = [
   { id: 1, name: 'Bộ luật Lao động 2019.pdf', department: 'Pháp chế', size: '3.2 MB', status: 'ready', updated: '06/10/2026' },
@@ -18,6 +19,7 @@ export default function DocumentsPage() {
   const [docs, setDocs] = useState(initialDocs)
   const [query, setQuery] = useState('')
   const [filter, setFilter] = useState('all')
+  const [deleteTarget, setDeleteTarget] = useState<(typeof initialDocs)[number] | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const visible = useMemo(() => docs.filter(doc => (filter === 'all' || doc.status === filter) && doc.name.toLowerCase().includes(query.toLowerCase())), [docs, query, filter])
 
@@ -41,9 +43,10 @@ export default function DocumentsPage() {
       </div>
       <div className="space-y-3">{visible.map(doc => <article key={doc.id} className="flex flex-col gap-4 rounded-xl bg-dark-surface/60 p-4 md:flex-row md:items-center">
         <FileText className="h-8 w-8 shrink-0 text-accent-400" /><div className="min-w-0 flex-1"><h2 className="truncate font-semibold">{doc.name}</h2><p className="text-sm text-gray-400">{doc.department} · {doc.size} · {doc.updated}</p></div><span className={`w-fit rounded-full px-3 py-1 text-xs ${statusColor[doc.status]}`}>{statusLabel[doc.status]}</span>
-        <div className="flex gap-2"><button title="Lập chỉ mục lại" onClick={() => setDocs(current => current.map(item => item.id === doc.id ? { ...item, status: 'processing' } : item))} className="rounded-lg p-2 hover:bg-white/10"><RefreshCw className="h-4 w-4" /></button><button title="Xóa tài liệu" onClick={() => setDocs(current => current.filter(item => item.id !== doc.id))} className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></button></div>
+        <div className="flex gap-2"><button title="Lập chỉ mục lại" onClick={() => setDocs(current => current.map(item => item.id === doc.id ? { ...item, status: 'processing' } : item))} className="rounded-lg p-2 hover:bg-white/10"><RefreshCw className="h-4 w-4" /></button><button title="Xóa tài liệu" onClick={() => setDeleteTarget(doc)} className="rounded-lg p-2 text-red-400 hover:bg-red-500/10"><Trash2 className="h-4 w-4" /></button></div>
       </article>)}</div>
       {!visible.length && <p className="py-10 text-center text-gray-400">Không tìm thấy tài liệu phù hợp.</p>}
     </section>
+    <ConfirmDialog isOpen={Boolean(deleteTarget)} onClose={() => setDeleteTarget(null)} onConfirm={() => { if (deleteTarget) setDocs(current => current.filter(item => item.id !== deleteTarget.id)); setDeleteTarget(null) }} title="Xóa tài liệu?" message={deleteTarget ? `“${deleteTarget.name}” sẽ bị xóa khỏi danh sách quản lý.` : ''} confirmLabel="Xóa tài liệu" />
   </AdminPageShell>
 }

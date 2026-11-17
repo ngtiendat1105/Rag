@@ -9,6 +9,7 @@ export interface User {
   role: UserRole
   department: string
   avatar?: string
+  avatarUrl?: string | null
   phone?: string | null
 }
 
@@ -68,7 +69,17 @@ export const useAuthStore = create<AuthState>()(
       },
 
       completeLogin: (user: User) => {
-        set({ user: { ...user, avatar: user.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}` }, token: 'http-only-session', isAuthenticated: true, isLoading: false })
+        const avatar = user.avatarUrl || user.avatar || undefined
+        set({
+          user: {
+            ...user,
+            avatar,
+            avatarUrl: avatar,
+          },
+          token: 'http-only-session',
+          isAuthenticated: true,
+          isLoading: false,
+        })
       },
     }),
     {

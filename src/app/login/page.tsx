@@ -16,19 +16,16 @@ export default function LoginPage() {
   const [showOTP, setShowOTP] = useState(false)
   const [userEmail, setUserEmail] = useState('')
   const [userPassword, setUserPassword] = useState('')
-  const [step, setStep] = useState(1) // 1: Login, 2: OTP
 
   const handleLoginSuccess = async (email: string, password: string) => {
     await requestOtp('send', email, { password })
     setUserEmail(email)
     setUserPassword(password)
     setShowOTP(true)
-    setStep(2)
   }
 
   const handleOTPBack = () => {
     setShowOTP(false)
-    setStep(1)
   }
 
   const handleVerifyOTP = async (otp: string) => {
@@ -79,29 +76,6 @@ export default function LoginPage() {
                 <div className="w-2 h-2 rounded-full bg-white/30" />
                 <div className="w-2 h-2 rounded-full bg-white/60" />
                 <div className="w-2 h-2 rounded-full bg-white" />
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Steps */}
-          <div className="p-6 border-b border-dark-border">
-            <div className="flex items-center justify-center gap-8">
-              <div className={`flex items-center gap-3 ${step >= 1 ? 'text-primary-400' : 'text-gray-500'}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center
-                  ${step >= 1 ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-surface border border-dark-border'}`}>
-                  1
-                </div>
-                <span className="font-medium">Đăng nhập</span>
-              </div>
-
-              <div className="flex-1 h-1 bg-dark-border" />
-
-              <div className={`flex items-center gap-3 ${step >= 2 ? 'text-primary-400' : 'text-gray-500'}`}>
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center
-                  ${step >= 2 ? 'bg-primary-500/20 border border-primary-500' : 'bg-dark-surface border border-dark-border'}`}>
-                  2
-                </div>
-                <span className="font-medium">Xác thực OTP</span>
               </div>
             </div>
           </div>

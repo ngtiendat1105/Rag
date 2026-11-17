@@ -9,6 +9,7 @@ import {
   BookOpen,
   Briefcase,
   ChevronDown,
+  Copy,
   Download,
   FileText,
   LogOut,
@@ -23,8 +24,12 @@ import ChatHistorySidebar from '@/components/chat/ChatHistorySidebar'
 import ChatInput from '@/components/chat/ChatInput'
 import ChatMessage from '@/components/chat/ChatMessage'
 import TypingIndicator from '@/components/chat/TypingIndicator'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
+import Modal from '@/components/ui/Modal'
+import { useToast } from '@/components/ui/ToastProvider'
+import UserAvatar from '@/components/ui/UserAvatar'
 import type { User } from '@/store/authStore'
-import { useChatStore } from '@/store/chatStore'
+import { useChatStore, type ChatAttachment } from '@/store/chatStore'
 import theme from '@/components/tuan/ui/theme.module.css'
 import styles from './workspace.module.css'
 
@@ -34,6 +39,22 @@ const suggestions = [
   { icon: FileText, label: 'Bảo hiểm xã hội', question: 'Mức đóng bảo hiểm xã hội được xác định như thế nào?' },
 ]
 
+const guide = `HƯỚNG DẪN SỬ DỤNG TRỢ LÝ PHÁP LÝ NỘI BỘ
+
+1. Đặt câu hỏi cụ thể, nêu số điều, tên văn bản hoặc phòng ban nếu bạn biết.
+2. Mở nguồn tham chiếu để đối chiếu câu trả lời với văn bản gốc.
+3. Lưu trữ, bỏ lưu trữ hoặc xuất hội thoại thành tệp .txt khi cần.
+4. Chọn Thử lại nếu dịch vụ gặp lỗi. Tránh gửi dữ liệu cá nhân hoặc thông tin mật không cần thiết.`
+
+function downloadText(content: string, name: string) {
+  const url = URL.createObjectURL(new Blob(['\uFEFF', content], { type: 'text/plain;charset=utf-8' }))
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = name
+  anchor.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
 interface Props {
   user: User
   onLogout: () => void
@@ -42,18 +63,48 @@ interface Props {
 export default function ChatWorkspace({ user, onLogout }: Props) {
   const {
     chats, activeChatId, isTyping, processingStage, setActiveChat,
-    createNewChat, sendMessage, deleteChat, archiveChat, rateMessage,
+    createNewChat, sendMessage, cancelMessage, retryMessage, deleteChat, archiveChat, unarchiveChat, rateMessage,
   } = useChatStore()
+  const { showToast } = useToast()
   const [appearance, setAppearance] = useState<'light' | 'dark'>('light')
   const [draft, setDraft] = useState('')
+  const [composerVersion, setComposerVersion] = useState(0)
   const [nearBottom, setNearBottom] = useState(true)
+  const [popularQuestions, setPopularQuestions] = useState<string[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(true)
+  const [showGuide, setShowGuide] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const transcriptRef = useRef<HTMLDivElement>(null)
   const drawerRef = useRef<HTMLDialogElement>(null)
   const activeChat = chats.find(chat => chat.id === activeChatId)
+  const deleteTarget = chats.find(chat => chat.id === deleteTargetId)
   const messages = activeChat?.messages
   const waitingForReply = isTyping && messages?.[messages.length - 1]?.status === 'sending'
   const hasMessages = Boolean(messages?.length)
+  const latestReply = messages?.slice().reverse().find(message => message.role === 'assistant' && message.status !== 'error')
+  const questions = latestReply?.suggestions?.length ? latestReply.suggestions : popularQuestions
+
+  useEffect(() => {
+    if (sessionStorage.getItem('chat-suggestions-hidden') === 'true') {
+      setShowSuggestions(false)
+      return
+    }
+    const controller = new AbortController()
+    fetch('/api/popular-questions?limit=5', { cache: 'no-store', signal: controller.signal })
+      .then(response => response.ok ? response.json() : null)
+      .then(data => {
+        if (!controller.signal.aborted && Array.isArray(data?.questions)) {
+          const values = data.questions
+            .map((item: { question?: string } | null) => item?.question)
+            .filter((item: unknown): item is string => typeof item === 'string' && item.trim().length > 0) as string[]
+          setPopularQuestions(values)
+        }
+      })
+      .catch(() => undefined)
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     if (localStorage.getItem('legalai-theme') === 'dark') setAppearance('dark')
@@ -84,42 +135,56 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
   function startChat() {
     createNewChat()
     setDraft('')
+    setComposerVersion(version => version + 1)
     setNearBottom(true)
     closeDrawer()
-    inputRef.current?.focus()
+    window.requestAnimationFrame(() => inputRef.current?.focus())
   }
 
   function selectChat(id: string) {
     if (id !== activeChatId) {
       setActiveChat(id)
       setDraft('')
+      setComposerVersion(version => version + 1)
       setNearBottom(true)
     }
     closeDrawer()
   }
 
-  async function submitQuestion(question: string) {
-    setNearBottom(true)
-    await sendMessage(question)
+  function fillDraft(question: string) {
+    setDraft(question)
+    inputRef.current?.focus()
   }
 
-  function exportChat() {
-    if (!activeChat) return
-    const content = activeChat.messages.map(message => {
+  async function submitQuestion(question: string, attachments: ChatAttachment[], files: File[]) {
+    setNearBottom(true)
+    await sendMessage(question, attachments, files)
+  }
+
+  function exportChat(id: string) {
+    const chat = chats.find(item => item.id === id)
+    if (!chat) return
+    const content = chat.messages.map(message => {
       const name = message.role === 'user' ? 'Bạn' : 'Legal AI'
       return `${name}: ${message.content}`
     }).join('\n\n')
-    const url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }))
-    const anchor = document.createElement('a')
-    anchor.href = url
-    anchor.download = `legal-ai-${activeChat.id}.txt`
-    anchor.click()
-    window.setTimeout(() => URL.revokeObjectURL(url), 0)
+    downloadText(content, `legal-ai-${chat.id}.txt`)
+  }
+
+  async function copyGuide() {
+    try {
+      await navigator.clipboard.writeText(guide)
+      showToast('Đã sao chép hướng dẫn.')
+    } catch {
+      showToast('Không thể sao chép hướng dẫn.', 'info')
+    }
   }
 
   const sidebarProps = {
     chats, activeChatId,
-    onChatSelect: selectChat, onNewChat: startChat, onDeleteChat: deleteChat, onArchiveChat: archiveChat,
+    onChatSelect: selectChat, onNewChat: startChat, onArchiveChat: archiveChat,
+    onUnarchiveChat: unarchiveChat, onExportChat: exportChat,
+    onDeleteChat: (id: string) => { closeDrawer(); setDeleteTargetId(id) },
   }
 
   return (
@@ -154,8 +219,8 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
                 <Archive size={18} aria-hidden="true" />
               </button>
             )}
-            {hasMessages && (
-              <button type="button" aria-label="Xuất hội thoại" title="Xuất hội thoại" className={`${theme.actionButton} ${styles.exportButton}`} onClick={exportChat}>
+            {activeChat && hasMessages && (
+              <button type="button" aria-label="Xuất hội thoại" title="Xuất hội thoại" className={`${theme.actionButton} ${styles.exportButton}`} onClick={() => exportChat(activeChat.id)}>
                 <Download size={18} aria-hidden="true" />
                 <span>Xuất hội thoại</span>
               </button>
@@ -173,7 +238,9 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               }}
             >
               <summary className={theme.actionButton} aria-label="Tài khoản">
-                <span className={styles.avatar} aria-hidden="true">{user.name.trim().charAt(0).toLocaleUpperCase('vi') || 'L'}</span>
+                {user.avatarUrl || user.avatar
+                  ? <UserAvatar src={user.avatarUrl || user.avatar} name={user.name} />
+                  : <span className={styles.avatar} aria-hidden="true">{user.name.trim().charAt(0).toLocaleUpperCase('vi') || 'L'}</span>}
                 <span className={styles.accountName}>{user.name}</span>
                 <ChevronDown size={14} aria-hidden="true" />
               </summary>
@@ -186,7 +253,10 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
                   <UserIcon size={17} aria-hidden="true" />
                   Hồ sơ cá nhân
                 </Link>
-                <button type="button" className={theme.actionButton} onClick={onLogout}>
+                <button type="button" className={theme.actionButton} onClick={() => setShowGuide(true)}>
+                  <BookOpen size={17} aria-hidden="true" /> Hướng dẫn sử dụng
+                </button>
+                <button type="button" className={theme.actionButton} onClick={() => setConfirmLogout(true)}>
                   <LogOut size={17} aria-hidden="true" />
                   Đăng xuất
                 </button>
@@ -206,9 +276,29 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
           {hasMessages ? (
             <div className={styles.transcript} role="log" aria-label="Tin nhắn hội thoại">
               <h1 className="sr-only">{activeChat?.title}</h1>
-              {messages?.map(message => (
-                <ChatMessage key={message.id} {...message} onRate={rating => rateMessage(message.id, rating)} />
-              ))}
+              {messages?.map((message, index) => {
+                const previous = messages[index - 1]
+                const failedQuestion = message.role === 'assistant' && message.status === 'error' && previous?.role === 'user' ? previous : null
+                const needsFiles = Boolean(failedQuestion?.attachments?.length)
+                return (
+                  <ChatMessage
+                    key={message.id}
+                    {...message}
+                    onRate={(rating, reason, detail) => rateMessage(message.id, rating, reason, message.content, detail)}
+                    onRetry={failedQuestion ? () => {
+                      if (needsFiles) {
+                        fillDraft(failedQuestion.content)
+                        showToast('Hãy chọn lại tệp đính kèm trước khi gửi.', 'info')
+                        return
+                      }
+                      setNearBottom(true)
+                      void retryMessage(message.id)
+                    } : undefined}
+                    retryLabel={needsFiles ? 'Soạn lại câu hỏi' : undefined}
+                    retryDisabled={isTyping}
+                  />
+                )
+              })}
               {waitingForReply && <TypingIndicator message={processingStage} />}
             </div>
           ) : (
@@ -219,7 +309,7 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               <ul className={styles.suggestions} aria-label="Gợi ý câu hỏi">
                 {suggestions.map(({ icon: Icon, label, question }) => (
                   <li key={label}>
-                    <button type="button" onClick={() => { setDraft(question); inputRef.current?.focus() }} disabled={isTyping}>
+                    <button type="button" onClick={() => fillDraft(question)} disabled={isTyping}>
                       <Icon size={19} aria-hidden="true" />
                       <span><strong>{label}</strong><span>{question}</span></span>
                       <ArrowUpRight className={styles.suggestionArrow} size={16} aria-hidden="true" />
@@ -237,11 +327,30 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
               <ArrowDown size={16} aria-hidden="true" /> Đến tin mới nhất
             </button>
           )}
+          {showSuggestions && questions.length > 0 && (
+            <div className={styles.questionSuggestions}>
+              <div role="group" aria-label="Câu hỏi gợi ý">
+                {Array.from(new Set(questions)).map(question => (
+                  <button key={question} title={question} type="button" className={theme.actionButton} disabled={isTyping} onClick={() => fillDraft(question)}>
+                    <span>{question}</span>
+                  </button>
+                ))}
+              </div>
+              <button className={theme.iconButton} aria-label="Ẩn câu hỏi gợi ý" type="button" onClick={() => {
+                sessionStorage.setItem('chat-suggestions-hidden', 'true')
+                setShowSuggestions(false)
+              }}>
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          )}
           <ChatInput
+            key={composerVersion}
             inputRef={inputRef}
             value={draft}
             onValueChange={setDraft}
             onSendMessage={submitQuestion}
+            onCancel={cancelMessage}
             isLoading={isTyping}
           />
         </div>
@@ -260,6 +369,28 @@ export default function ChatWorkspace({ user, onLogout }: Props) {
           <ChatHistorySidebar {...sidebarProps} />
         </div>
       </dialog>
+      {deleteTarget && (
+        <ConfirmDialog isOpen title="Xóa cuộc trò chuyện?" message={`“${deleteTarget.title}” sẽ bị xóa khỏi lịch sử trên thiết bị này.`} confirmLabel="Xóa cuộc trò chuyện" onClose={() => setDeleteTargetId(null)} onConfirm={() => {
+          deleteChat(deleteTarget.id)
+          setDeleteTargetId(null)
+        }} />
+      )}
+      {confirmLogout && (
+        <ConfirmDialog isOpen title="Đăng xuất khỏi hệ thống?" message="Phiên làm việc hiện tại sẽ kết thúc trên thiết bị này." confirmLabel="Đăng xuất" onClose={() => setConfirmLogout(false)} onConfirm={onLogout} />
+      )}
+      {showGuide && (
+        <Modal isOpen title="Hướng dẫn sử dụng" tone="light" size="sm" onClose={() => setShowGuide(false)}>
+          <p className="max-h-[50dvh] overflow-auto whitespace-pre-line text-sm leading-relaxed">{guide}</p>
+          <div className="mt-4 flex flex-wrap gap-2 text-slate-700">
+            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => void copyGuide()}>
+              <Copy size={16} aria-hidden="true" /> Sao chép
+            </button>
+            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-md border px-3 text-sm" onClick={() => downloadText(guide, 'huong-dan-su-dung-chatbot.txt')}>
+              <Download size={16} aria-hidden="true" /> Xuất hướng dẫn
+            </button>
+          </div>
+        </Modal>
+      )}
     </main>
   )
 }

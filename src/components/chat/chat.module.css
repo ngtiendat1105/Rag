@@ -124,6 +124,13 @@
   list-style: none;
 }
 
+.historyGroup > h3 {
+  padding: 8px 8px 3px;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
 .historyRow {
   display: flex;
   min-width: 0;
@@ -178,6 +185,7 @@
 
 .historyActions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 2px;
 }
@@ -187,11 +195,53 @@
 }
 
 .composer {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--ui-line);
   border-radius: var(--ui-radius-lg);
   background: var(--ui-surface);
   box-shadow: var(--ui-shadow);
+}
+
+.dragOverlay {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  border: 2px dashed var(--ui-focus);
+  border-radius: inherit;
+  background: var(--ui-selected);
+  pointer-events: none;
+  color: var(--ui-primary);
+  font-size: 0.875rem;
+  text-align: center;
+}
+
+.selectedFiles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 7px;
+  padding: 6px 9px 0;
+  list-style: none;
+}
+
+.selectedFiles li {
+  display: flex;
+  max-width: 100%;
+  align-items: center;
+  gap: 5px;
+  padding-left: 8px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-subtle);
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+}
+
+.selectedFiles span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .composer:focus-within {
@@ -228,6 +278,10 @@
   justify-content: flex-end;
   gap: 12px;
   padding: 0 7px 7px 15px;
+}
+
+.composerControls > button:first-child {
+  margin-inline-end: auto;
 }
 
 .keyboardHint,
@@ -433,6 +487,35 @@
 .reference > p {
   padding: 0 0 10px 24px;
   color: var(--ui-muted);
+}
+
+.referenceActions,
+.feedbackReasons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.referenceActions {
+  padding-bottom: 6px;
+}
+
+.feedback {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  font-size: 0.875rem;
+}
+
+.feedbackReasons button {
+  border: 1px solid var(--ui-line);
+}
+
+.feedback [role='alert'] {
+  color: var(--ui-danger);
 }
 
 .messageActions {
