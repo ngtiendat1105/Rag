@@ -99,20 +99,25 @@
   padding: 7px 12px 16px;
 }
 
-.historyHeading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding-left: 7px;
+.historyFilters {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-subtle);
 }
 
-.historyHeading h2 {
-  font-size: 0.8125rem;
-  font-weight: 650;
+.historyFilters button {
+  min-height: 44px;
+  gap: 5px;
+  padding-inline: 4px;
+  font-size: 0.75rem;
 }
 
 .historyEmpty {
-  padding: 7px;
+  padding: 12px 8px;
   color: var(--ui-muted);
   font-size: 0.8125rem;
   line-height: 1.55;
@@ -120,6 +125,7 @@
 
 .historyList {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 3px;
   list-style: none;
 }
@@ -165,6 +171,7 @@
 
 .historySelect > span {
   min-width: 0;
+  flex: 1;
 }
 
 .historySelect strong {
@@ -246,6 +253,7 @@
 
 .composer:focus-within {
   border-color: var(--ui-focus);
+  box-shadow: 0 0 0 2px var(--ui-selected), var(--ui-shadow);
 }
 
 .composer textarea {
@@ -365,6 +373,12 @@
   background: var(--ui-selected);
 }
 
+.message[data-role='assistant'] .messageContent:not([data-status='error']) {
+  padding: 3px 0;
+  border: none;
+  background: transparent;
+}
+
 .message .messageContent[data-status='error'] {
   background: var(--ui-danger-surface);
   color: var(--ui-danger);
@@ -419,6 +433,10 @@
   background: var(--ui-subtle);
 }
 
+.markdown table {
+  width: fit-content;
+}
+
 .markdown pre,
 .markdown :is(th, td) {
   padding: 8px 10px;
@@ -455,49 +473,47 @@
   font-weight: 650;
 }
 
-.reference {
-  padding-inline: 10px;
-  border-radius: var(--ui-radius);
-  background: var(--ui-subtle);
-  font-size: 0.8125rem;
-}
-
-.reference > summary {
-  display: flex;
-  min-height: 44px;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
+.references ul {
+  display: grid;
+  gap: 6px;
   list-style: none;
 }
 
-.reference > summary::-webkit-details-marker {
-  display: none;
+.reference {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  font-size: 0.8125rem;
+  text-align: start;
 }
 
-.reference > summary svg {
+.reference:hover,
+.reference[aria-pressed='true'] {
+  border-color: var(--ui-focus);
+  background: var(--ui-selected);
+}
+
+.reference svg {
   flex: none;
-  color: var(--ui-muted);
+  color: var(--ui-primary);
 }
 
-.reference > summary span {
+.reference span {
+  min-width: 0;
   flex: 1;
+  overflow-wrap: anywhere;
 }
 
-.reference > p {
-  padding: 0 0 10px 24px;
-  color: var(--ui-muted);
-}
-
-.referenceActions,
 .feedbackReasons {
   display: flex;
   flex-wrap: wrap;
   gap: 4px;
-}
-
-.referenceActions {
-  padding-bottom: 6px;
 }
 
 .feedback {

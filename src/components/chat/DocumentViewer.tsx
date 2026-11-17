@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { ExternalLink, X } from 'lucide-react'
 import type { ChatReference } from '@/store/chatStore'
 
@@ -10,30 +10,59 @@ interface Props {
 }
 
 export default function DocumentViewer({ reference, onClose }: Props) {
+  const dialogRef = useRef<HTMLDialogElement>(null)
+
   useEffect(() => {
-    if (!reference) return
-    const handleKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') onClose() }
-    document.addEventListener('keydown', handleKeyDown)
-    return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [reference, onClose])
+    const dialog = dialogRef.current
+    if (reference && dialog && !dialog.open) dialog.showModal()
+  }, [reference])
 
   if (!reference) return null
   const viewerUrl = reference.previewUrl
     ? `${reference.previewUrl}${reference.page ? `#page=${reference.page}` : ''}`
     : ''
 
-  return <div className="fixed inset-0 z-[90] flex items-stretch bg-slate-950/60 p-3 backdrop-blur-sm md:p-6" role="dialog" aria-modal="true" aria-label="Xem tài liệu nguồn">
-    <div className="flex min-w-0 flex-1 overflow-hidden rounded-2xl bg-white shadow-2xl">
-      <div className="hidden w-[min(34%,28rem)] shrink-0 overflow-y-auto border-r border-slate-200 bg-slate-50 p-5 md:block">
-        <div className="mb-5 flex items-start justify-between gap-3"><div><p className="text-xs font-semibold uppercase tracking-wide text-[#a7793d]">Nguồn tham khảo</p><h2 className="mt-1 break-words text-base font-semibold text-slate-900">{reference.title}</h2></div><button onClick={onClose} className="rounded-lg p-2 text-slate-400 hover:bg-white hover:text-slate-700" aria-label="Đóng trình xem"><X className="h-5 w-5" /></button></div>
-        {reference.page && <p className="text-xs text-slate-500">Trang {reference.page} sẽ được mở trong trình xem.</p>}
-        <p className="mt-4 text-sm leading-6 text-slate-700">{reference.excerpt || 'Chưa có đoạn trích chi tiết cho nguồn này.'}</p>
-        {!reference.previewUrl && <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-800">File gốc chưa được liên kết hoặc không phải PDF. Hãy kiểm tra tài liệu trong kho quản trị.</p>}
+  function dismiss() {
+    dialogRef.current?.close()
+    onClose()
+  }
+
+  return (
+    <dialog
+      ref={dialogRef}
+      className="fixed inset-0 m-0 h-[100dvh] w-full max-h-none max-w-none bg-transparent p-3 text-[var(--ui-text)] backdrop:bg-slate-950/60 md:p-6"
+      aria-label="Xem tài liệu nguồn"
+      onCancel={event => { event.preventDefault(); dismiss() }}
+      onClick={event => { if (event.currentTarget === event.target) dismiss() }}
+    >
+      <div className="flex h-full flex-col overflow-hidden rounded-2xl bg-[var(--ui-surface)] shadow-2xl">
+        <header className="flex min-h-14 items-center justify-between gap-3 border-b border-[var(--ui-line)] px-3 md:px-5">
+          <h2 className="min-w-0 truncate text-sm font-semibold" title={reference.title}>{reference.title}</h2>
+          <div className="flex flex-none gap-1">
+            {reference.previewUrl && (
+              <a href={viewerUrl} target="_blank" rel="noreferrer" className="grid size-11 place-items-center rounded-lg hover:bg-[var(--ui-hover)]" aria-label="Mở tài liệu trong tab mới">
+                <ExternalLink size={18} aria-hidden="true" />
+              </a>
+            )}
+            <button type="button" onClick={dismiss} className="grid size-11 place-items-center rounded-lg hover:bg-[var(--ui-hover)]" aria-label="Đóng trình xem">
+              <X size={20} aria-hidden="true" />
+            </button>
+          </div>
+        </header>
+        <div className="flex min-h-0 flex-1">
+          {reference.excerpt && (
+            <div className="hidden w-[min(34%,28rem)] shrink-0 overflow-y-auto border-r border-[var(--ui-line)] bg-[var(--ui-sidebar)] p-5 md:block">
+              {reference.page && <p className="mb-2 text-xs font-semibold">Trang {reference.page}</p>}
+              <p className="whitespace-pre-wrap break-words text-sm leading-6">{reference.excerpt}</p>
+            </div>
+          )}
+          <div className="min-w-0 flex-1 bg-[var(--ui-subtle)]">
+            {reference.previewUrl
+              ? <iframe title={reference.title} src={viewerUrl} className="h-full w-full" />
+              : <p className="grid h-full place-items-center p-8 text-center text-sm text-[var(--ui-muted)]">Không có bản PDF để hiển thị.</p>}
+          </div>
+        </div>
       </div>
-      <div className="relative min-w-0 flex-1 bg-slate-100">
-        <div className="absolute right-3 top-3 z-10 flex gap-2"><button onClick={onClose} className="rounded-lg bg-white p-2 text-slate-500 shadow hover:text-slate-900 md:hidden" aria-label="Đóng trình xem"><X className="h-5 w-5" /></button>{reference.previewUrl && <a href={viewerUrl} target="_blank" rel="noreferrer" className="rounded-lg bg-white p-2 text-slate-500 shadow hover:text-[#173f73]" aria-label="Mở tài liệu trong tab mới"><ExternalLink className="h-5 w-5" /></a>}</div>
-        {reference.previewUrl ? <iframe title={reference.title} src={viewerUrl} className="h-full w-full" /> : <div className="flex h-full items-center justify-center p-8 text-center text-sm text-slate-500">Không có bản PDF để hiển thị.</div>}
-      </div>
-    </div>
-  </div>
+    </dialog>
+  )
 }

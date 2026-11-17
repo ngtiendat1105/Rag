@@ -72,15 +72,17 @@ export default function ChatHistorySidebar({
           <span className="sr-only">Tìm hội thoại</span>
           <input value={query} onChange={event => { setQuery(event.target.value); setOpenMenu(null) }} placeholder="Tìm hội thoại…" type="search" />
         </label>
+        <div className={styles.historyFilters} role="group" aria-label="Lọc lịch sử">
+          <button type="button" className={theme.actionButton} aria-pressed={!showArchive} onClick={() => { setShowArchive(false); setOpenMenu(null) }}>
+            <MessageSquare size={15} aria-hidden="true" /> Hội thoại
+          </button>
+          <button type="button" className={theme.actionButton} aria-label="Hội thoại đã lưu trữ" aria-pressed={showArchive} onClick={() => { setShowArchive(true); setOpenMenu(null) }}>
+            <Archive size={15} aria-hidden="true" /> Lưu trữ
+          </button>
+        </div>
       </div>
 
       <div className={styles.history}>
-        <div className={styles.historyHeading}>
-          <h2>{showArchive ? 'Đã lưu trữ' : 'Hội thoại'}</h2>
-          <button type="button" className={theme.iconButton} title="Hội thoại đã lưu trữ" aria-label="Hội thoại đã lưu trữ" aria-pressed={showArchive} onClick={() => { setShowArchive(!showArchive); setOpenMenu(null) }}>
-            <Archive size={17} aria-hidden="true" />
-          </button>
-        </div>
         {visible.length === 0 ? (
           <p className={styles.historyEmpty}>
             {search ? 'Không tìm thấy hội thoại.' : showArchive ? 'Chưa có hội thoại lưu trữ.' : 'Hội thoại của bạn sẽ xuất hiện ở đây.'}
