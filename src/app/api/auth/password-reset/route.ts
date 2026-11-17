@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { sendOtp, verifyOtp } from '@/lib/otp'
 import { findUserByEmail, resetUserPassword } from '@/lib/supabaseUsers'
-import { isAllowedRequestOrigin } from '@/lib/requestOrigin'
+import { isSameOrigin } from '@/lib/requestOrigin'
 
 export const runtime = 'nodejs'
 
@@ -9,7 +9,7 @@ const COOKIE_NAME = 'legal-password-reset'
 const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
 export async function POST(request: NextRequest) {
-  if (!isAllowedRequestOrigin(request)) {
+  if (!isSameOrigin(request)) {
     return NextResponse.json({ message: 'Yêu cầu không hợp lệ.' }, { status: 403 })
   }
 

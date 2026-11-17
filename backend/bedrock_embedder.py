@@ -80,3 +80,4 @@ class BedrockEmbedder:
             and embeddings.shape == (expected_count, self.embedding_dimension)
             and not np.any(np.isnan(embeddings))
         )
+

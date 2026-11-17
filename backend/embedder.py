@@ -9,7 +9,6 @@ from typing import List, Optional, Union
 import numpy as np
 
 SentenceTransformer = None
-SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 from config_phase2 import (
     VIETNAMESE_EMBEDDING_MODEL, 
@@ -38,12 +37,11 @@ class VietnameseEmbedder:
             ImportError: Nếu sentence-transformers chưa được cài đặt
             RuntimeError: Nếu không thể tải model
         """
-        global SentenceTransformer, SENTENCE_TRANSFORMERS_AVAILABLE
+        global SentenceTransformer
         if SentenceTransformer is None:
             try:
                 from sentence_transformers import SentenceTransformer as _SentenceTransformer
                 SentenceTransformer = _SentenceTransformer
-                SENTENCE_TRANSFORMERS_AVAILABLE = True
             except ImportError as exc:
                 raise ImportError(
                     "sentence-transformers is required for local embeddings"
@@ -83,11 +81,7 @@ class VietnameseEmbedder:
             )
             
             # Kiểm tra embedding dimension thực tế
-            if hasattr(self.model, "get_sentence_embedding_dimension"):
-                actual_dimension = self.model.get_sentence_embedding_dimension()
-            else:
-                probe = self.model.encode("dimension probe", convert_to_numpy=True)
-                actual_dimension = int(np.asarray(probe).shape[-1])
+            actual_dimension = self.model.get_sentence_embedding_dimension()
             
             if actual_dimension != self.embedding_dimension:
                 print(f"⚠️ Dimension mismatch: config={self.embedding_dimension}, actual={actual_dimension}")

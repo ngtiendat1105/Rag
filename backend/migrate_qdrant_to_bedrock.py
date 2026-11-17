@@ -132,3 +132,4 @@ def main() -> None:
 if __name__ == "__main__":
     load_dotenv(Path(__file__).resolve().parents[1] / ".env.local", override=False)
     main()
+

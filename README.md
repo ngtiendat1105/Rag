@@ -1,154 +1,174 @@
-# Legal AI
+# LegalAI
 
-Ứng dụng hỏi đáp pháp lý gồm giao diện Next.js, quản lý người dùng bằng Supabase và dịch vụ RAG Python sử dụng Qdrant + Ollama.
+LegalAI là trợ lý tra cứu pháp lý nội bộ, dùng Next.js, Supabase, Resend,
+Amazon Bedrock, Qdrant Cloud, API Gateway và AWS Lambda.
 
-## Cấu trúc dự án
+## Kiến trúc
 
 ```text
-webRag/
-├── src/                    # Frontend Next.js và API routes
-├── backend/                # FastAPI và toàn bộ RAG pipeline
-│   ├── data_documents/     # Tài liệu nguồn Markdown, PDF, DOCX
-│   ├── evaluation/         # Bộ dữ liệu đánh giá retrieval
-│   ├── tests/              # Kiểm thử Python
-│   ├── processed_output/   # JSONL sinh tự động, không commit
-│   ├── vector_db/          # Qdrant local, không commit
-│   ├── api.py              # FastAPI entrypoint
-│   ├── sync_documents.py   # Đồng bộ và lập chỉ mục tài liệu
-│   └── requirements.txt
-├── docs/                   # Hướng dẫn setup, testing và RAG
-├── scripts/                # Tiện ích frontend/Node.js
-├── supabase/               # Schema và migration Supabase
-└── .env.local              # Biến môi trường local, không commit
+Browser → Amplify (Next.js) → API Gateway → Lambda (FastAPI)
+                                                    ├─ Titan Embeddings V2
+                                                    ├─ Qdrant Cloud
+                                                    └─ Nova Lite Converse API
+
+Supabase: users, profiles và metadata ứng dụng
+Resend: OTP email
+```
+
+| Thành phần | Vai trò |
+|---|---|
+| Next.js | Chat, đăng nhập, hồ sơ, admin |
+| Supabase | User và dữ liệu ứng dụng |
+| Resend | Gửi OTP |
+| Amplify | Deploy frontend theo branch |
+| Lambda + API Gateway | Backend FastAPI serverless |
+| Bedrock Nova Lite | Sinh câu trả lời |
+| Bedrock Titan V2 | Embedding |
+| Qdrant Cloud | Vector search |
+
+## Cấu trúc
+
+```text
+src/                    # Next.js frontend và API routes
+backend/                # FastAPI, RAG pipeline và Bedrock adapters
+backend/data_documents/ # Tài liệu nguồn local
+deployment/lambda/      # Dockerfile và IAM policy
+deployment/scripts/     # Smoke tests
+supabase/               # Schema và migrations
+docs/                   # Tài liệu setup
 ```
 
 ## Chạy local
 
-Cài frontend và backend:
-
 ```powershell
 npm install
-python -m pip install -r backend/requirements.txt
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -r backend\requirements.txt
 ```
 
-Đồng bộ tài liệu khi mới cài hoặc sau khi thay đổi file trong `backend/data_documents`:
-
-```powershell
-$env:HF_HUB_OFFLINE='1' # chỉ dùng khi model embedding đã có trong cache
-python backend/sync_documents.py
-```
-
-Chạy FastAPI tại thư mục gốc dự án:
+Backend:
 
 ```powershell
 python -m uvicorn --app-dir backend api:app --host 127.0.0.1 --port 8000
 ```
 
-Hoặc dùng script ngắn:
-
-```powershell
-npm run rag:api
-```
-
-Chạy Next.js trong terminal khác:
+Frontend:
 
 ```powershell
 npm run dev
 ```
 
-Mở địa chỉ Next.js in ra terminal, thường là `http://localhost:3000` hoặc `http://localhost:3001`.
+## Environment
 
-## Retrieve-and-rerank
+Không commit `.env.local`. Cấu hình chính:
 
-The retriever performs a wide Qdrant search before sending only the best
-documents to the LLM. The default configuration retrieves 8 candidates and
-keeps 3 after reranking:
-
-```env
-RAG_TOP_K=8
-RAG_RETRIEVAL_TOP_K=8
-RAG_RERANK_TOP_N=3
-RAG_RERANKER_MODEL=
-RAG_RERANKER_MAX_LENGTH=512
+```dotenv
+RAG_LLM_PROVIDER=bedrock
+RAG_LLM_MODEL=us.amazon.nova-lite-v1:0
+BEDROCK_REGION=us-east-1
+RAG_EMBEDDING_PROVIDER=bedrock
+RAG_EMBEDDING_MODEL=amazon.titan-embed-text-v2:0
+RAG_EMBEDDING_DIMENSION=1024
+QDRANT_COLLECTION=legal_knowledge_base_titan_v2_1024
+QDRANT_URL=https://your-cluster.qdrant.io
+QDRANT_API_KEY=your-qdrant-key
+LEGALAI_API_KEY=your-internal-api-key
+RAG_API_URL=https://your-api-id.execute-api.us-east-1.amazonaws.com
 ```
 
-Set `RAG_RERANKER_MODEL` to a locally available Sentence Transformers
-CrossEncoder to enable reranking. `BAAI/bge-reranker-v2-m3` is the preferred
-multilingual starting point for Vietnamese queries, at the cost of additional
-RAM and model download. Leave it empty for lower latency; if reranking fails,
-the service automatically falls back to Qdrant/lexical ranking.
+Lambda dùng IAM execution role để gọi Bedrock, không đặt AWS access key trong
+image. Secret Supabase, Resend, Qdrant và API key phải để server-side.
 
-## Benchmark LLM local
+## Qdrant và indexing
 
-Benchmark Ollama trên cùng bộ câu hỏi pháp lý:
+Production dùng collection `legal_knowledge_base_titan_v2_1024`, embedding
+`amazon.titan-embed-text-v2:0`, dimension 1024 và khoảng cách Cosine.
+Collection cũ `legal_knowledge_base` vẫn giữ để rollback; không trộn vector
+768 chiều với collection Titan 1024 chiều.
 
 ```powershell
-# Dừng backend FastAPI trước vì Qdrant local chỉ cho một process truy cập.
-python backend/benchmark_llm.py --models llama3.2:latest llama3.1:latest mistral:latest
+.\.venv\Scripts\python.exe backend\sync_documents.py
+.\.venv\Scripts\python.exe backend\payload_indexes.py --apply
 ```
 
-Model chưa cài sẽ được bỏ qua. Để tự động tải model:
+## Upload tài liệu
+
+Để file người dùng được dùng trong RAG, nên triển khai:
+
+```text
+Frontend → S3 presigned URL → S3 → SQS → Lambda worker
+                                      ↓
+                        PDF/DOCX parser hoặc Textract
+                                      ↓
+                           Chunking → Titan Embeddings
+                                      ↓
+                                 Qdrant Cloud
+```
+
+Vector cần metadata `user_id`, `document_id`, `file_name`, `page`. Supabase
+lưu trạng thái `uploaded`, `processing`, `ready`, `failed`. Retriever phải lọc
+theo `user_id` để bảo vệ tài liệu riêng.
+
+## Kiểm thử
 
 ```powershell
-python backend/benchmark_llm.py --pull
+npm run build
+.\.venv\Scripts\python.exe -m pytest backend\tests\unit -q
+.\.venv\Scripts\python.exe deployment\scripts\verify_bedrock_rag.py
 ```
 
-Kết quả được ghi vào `llm_benchmark_results.json` và
-`llm_benchmark_report.md`. Benchmark đo các proxy chất lượng
-faithfulness/relevance/citation/unsupported-claim cùng TTFT, TPS và kích
-thước model Ollama đang resident. Các proxy không thay thế review pháp lý thủ
-công.
-
-Chuyển model chạy local bằng `.env.local`, sau đó restart FastAPI:
-
-```env
-RAG_LLM_PROVIDER=ollama
-RAG_LLM_MODEL=llama3.1:latest
-OLLAMA_BASE_URL=http://127.0.0.1:11434
+```powershell
+.\.venv\Scripts\python.exe deployment\scripts\verify_bedrock_rag.py --lambda-function legalai-rag
+.\.venv\Scripts\python.exe deployment\scripts\verify_bedrock_rag.py --api-url https://your-api-id.execute-api.us-east-1.amazonaws.com
 ```
 
-### Model selection matrix
+## Deploy Lambda
 
-| Phần cứng | Model nên thử | Ghi chú |
+```powershell
+$ecrUri="ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/legalai-rag"
+aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin $ecrUri
+docker buildx build --platform linux/amd64 --provenance=false -f deployment/lambda/Dockerfile -t "${ecrUri}:latest" --push .
+aws lambda update-function-code --function-name legalai-rag --image-uri "${ecrUri}:latest" --publish --region us-east-1
+```
+
+## Git và Amplify
+
+```text
+feature/* → dev → main
+```
+
+| Branch | Mục đích | Domain |
 |---|---|---|
-| RAM 8 GB, CPU | `llama3.2:latest` | Nhanh, context ngắn; phù hợp baseline |
-| RAM 16 GB, CPU/GPU 6 GB | `llama3.1:latest`, `mistral:latest` | Cân bằng chất lượng và tốc độ |
-| RAM 16–32 GB, VRAM 8 GB | `qwen2.5:7b` | Nên benchmark tiếng Việt thực tế trước khi dùng |
-| VRAM 12 GB trở lên | `vistral:7b` hoặc model 7B multilingual | Chất lượng tiềm năng cao hơn, phụ thuộc tag Ollama |
+| `main` | Production | `legalai.id.vn` |
+| `dev` | Staging | Amplify branch domain |
+| `feature/*` | Preview | Amplify preview domain |
 
-Không pull model chỉ dựa trên tên ví dụ; hãy xác nhận tag tồn tại bằng
-`ollama search`/Ollama registry và đo trên đúng phần cứng production.
-
-### Production Ollama
-
-Trên server Linux:
-
-```bash
-RAG_BENCHMARK_MODELS="llama3.1:latest mistral:latest" \
-  sh backend/scripts/setup_ollama.sh
+```powershell
+git checkout dev
+git pull origin dev
+git checkout -b feature/ten-chuc-nang
+git add .
+git commit -m "Describe the change"
+git push -u origin feature/ten-chuc-nang
 ```
 
-Script sẽ kiểm tra Ollama, GPU NVIDIA nếu có, pull model và restart service
-đã được systemd enable. Sau đó đặt `RAG_LLM_MODEL` trên backend production,
-restart FastAPI một worker, rồi kiểm tra `/health` và chạy benchmark smoke test.
+Sau khi kiểm thử `dev`, tạo Pull Request `dev → main`. Amplify tự chạy
+`npm ci` và `npm run build`; mỗi branch cần có `RAG_API_URL` đúng.
 
-## Hồ sơ người dùng
+## Bảo mật
 
-Người dùng đã đăng nhập có thể mở `/profile` từ menu tài khoản trên trang chat để cập nhật họ tên, số điện thoại và ảnh đại diện. Trước khi sử dụng, chạy migration `supabase/migrations/20261022_add_profile_fields.sql` trong Supabase SQL Editor.
+- Không commit `.env.local`, Supabase service-role key, Resend key hoặc Qdrant key.
+- Bật RLS cho bảng Supabase.
+- Lọc Qdrant theo `user_id` và `document_id`.
+- Giới hạn loại file và dung lượng upload.
+- Theo dõi Lambda, Bedrock, API Gateway, SQS và worker bằng CloudWatch.
+- Giữ Lambda version ổn định để rollback.
 
-## Deploy
+## Tài liệu liên quan
 
-- Frontend: deploy thư mục gốc lên Vercel.
-- Backend: deploy FastAPI, Ollama và Qdrant lên VPS bằng Docker Compose trong `deployment/`.
-- `RAG_API_URL` trên Vercel phải trỏ tới URL FastAPI public.
-- Qdrant local chỉ phù hợp cho một tiến trình; production nên dùng Qdrant Cloud hoặc Qdrant server.
-- Không commit `.env.local`, `backend/vector_db` hoặc `backend/processed_output`.
-
-Hướng dẫn từng bước: [deployment/README.md](deployment/README.md).
-
-Xem thêm:
-
-- [Kiến trúc và vận hành RAG](docs/rag/RAG_SYSTEM.md)
-- [Thiết lập Supabase](docs/setup/SUPABASE_SETUP.md)
-- [Thiết lập Resend](docs/setup/RESEND_SETUP.md)
-- [Hướng dẫn kiểm thử](docs/testing/TEST_INSTRUCTIONS.md)
+- [deployment/lambda/BEDROCK.md](deployment/lambda/BEDROCK.md)
+- [docs/rag/RAG_SYSTEM.md](docs/rag/RAG_SYSTEM.md)
+- [docs/setup/SUPABASE_SETUP.md](docs/setup/SUPABASE_SETUP.md)
+- [docs/setup/RESEND_SETUP.md](docs/setup/RESEND_SETUP.md)
+- [docs/testing/TEST_INSTRUCTIONS.md](docs/testing/TEST_INSTRUCTIONS.md)

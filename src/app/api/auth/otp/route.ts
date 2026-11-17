@@ -2,12 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { sendOtp, verifyOtp } from '@/lib/otp'
 import { authenticateUser, findUserByEmail } from '@/lib/supabaseUsers'
 import { createSession, SESSION_COOKIE } from '@/lib/session'
-import { isAllowedRequestOrigin } from '@/lib/requestOrigin'
+import { isSameOrigin } from '@/lib/requestOrigin'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
-  if (!isAllowedRequestOrigin(request)) {
+  if (!isSameOrigin(request)) {
     return NextResponse.json({ message: 'Yêu cầu không hợp lệ.' }, { status: 403 })
   }
   try {
