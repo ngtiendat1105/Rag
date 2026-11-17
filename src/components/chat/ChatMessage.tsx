@@ -1,11 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { AlertCircle, Check, ChevronDown, Copy, ExternalLink, FileText, RotateCcw, Scale, ThumbsDown, ThumbsUp } from 'lucide-react'
+import { AlertCircle, Check, ChevronRight, Copy, FileText, RotateCcw, Scale, ThumbsDown, ThumbsUp } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import DislikeFeedbackModal from '@/components/chat/DislikeFeedbackModal'
-import DocumentViewer from '@/components/chat/DocumentViewer'
 import { useToast } from '@/components/ui/ToastProvider'
 import type { ChatAttachment, ChatReference } from '@/store/chatStore'
 import { formatDate } from '@/utils/formatters'
@@ -20,6 +19,8 @@ interface Props {
   references?: Array<string | ChatReference>
   attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
+  selectedReferenceIndex?: number
+  onSelectReference: (reference: ChatReference, index: number, trigger: HTMLButtonElement) => void
   onRate: (rating: 'like' | 'dislike', reason: string, detail?: string) => Promise<void>
   onRetry?: () => void
   retryLabel?: string
@@ -29,7 +30,8 @@ interface Props {
 const likeReasons = ['Đúng và hữu ích', 'Nguồn rõ ràng', 'Dễ hiểu', 'Đúng nhu cầu']
 
 export default function ChatMessage({
-  role, content, timestamp, status = 'sent', references = [], attachments = [], rating, onRate,
+  role, content, timestamp, status = 'sent', references = [], attachments = [], rating,
+  selectedReferenceIndex, onSelectReference, onRate,
   onRetry, retryLabel = 'Thử lại câu hỏi', retryDisabled,
 }: Props) {
   const [copyStatus, setCopyStatus] = useState<'idle' | 'copied' | 'error'>('idle')
@@ -37,7 +39,6 @@ export default function ChatMessage({
   const [showDislikeForm, setShowDislikeForm] = useState(false)
   const [submittingLike, setSubmittingLike] = useState(false)
   const [feedbackError, setFeedbackError] = useState('')
-  const [viewerReference, setViewerReference] = useState<ChatReference | null>(null)
   const { showToast } = useToast()
   const isUser = role === 'user'
   const isAssistant = role === 'assistant'
@@ -55,20 +56,6 @@ export default function ChatMessage({
       setCopyStatus('copied')
     } catch {
       setCopyStatus('error')
-    }
-  }
-
-  async function copyReference(reference: ChatReference) {
-    const citation = [
-      reference.title,
-      reference.page ? `Trang ${reference.page}` : '',
-      reference.excerpt,
-    ].filter(Boolean).join(' — ')
-    try {
-      await navigator.clipboard.writeText(citation)
-      showToast('Đã sao chép nguồn tham khảo.')
-    } catch {
-      showToast('Không thể sao chép nguồn tham khảo.', 'info')
     }
   }
 
@@ -115,29 +102,21 @@ export default function ChatMessage({
           {showActions && references.length > 0 && (
             <div className={styles.references}>
               <p>Nguồn tham chiếu ({references.length})</p>
-              {references.map((reference, index) => {
-                const item = typeof reference === 'string' ? { title: reference } : reference
-                return (
-                  <details className={styles.reference} key={`${item.title}-${index}`}>
-                    <summary>
-                      <FileText size={16} aria-hidden="true" />
-                      <span>{item.title}{item.page ? ` · Trang ${item.page}` : ''}</span>
-                      <ChevronDown size={15} aria-hidden="true" />
-                    </summary>
-                    <p>{item.excerpt || 'Chưa có thông tin chi tiết cho nguồn này.'}</p>
-                    <div className={styles.referenceActions}>
-                      <button type="button" className={theme.actionButton} onClick={() => void copyReference(item)}>
-                        <Copy size={16} aria-hidden="true" /> Sao chép nguồn
+              <ul aria-label="Tài liệu trích dẫn">
+                {references.map((reference, index) => {
+                  const item = typeof reference === 'string' ? { title: reference } : reference
+                  return (
+                    <li key={`${item.title}-${index}`}>
+                      <button type="button" className={styles.reference} aria-pressed={selectedReferenceIndex === index}
+                        onClick={event => onSelectReference(item, index, event.currentTarget)}>
+                        <FileText size={16} aria-hidden="true" />
+                        <span>{item.title}{item.page ? ` · Trang ${item.page}` : ''}</span>
+                        <ChevronRight size={16} aria-hidden="true" />
                       </button>
-                      {item.previewUrl && (
-                        <button type="button" className={theme.actionButton} onClick={() => setViewerReference(item)}>
-                          <ExternalLink size={16} aria-hidden="true" /> Xem tài liệu
-                        </button>
-                      )}
-                    </div>
-                  </details>
-                )
-              })}
+                    </li>
+                  )
+                })}
+              </ul>
             </div>
           )}
         </div>
@@ -190,7 +169,6 @@ export default function ChatMessage({
           showToast('Đã ghi nhận phản hồi cải thiện.')
         }} />
       )}
-      <DocumentViewer reference={viewerReference} onClose={() => setViewerReference(null)} />
     </article>
   )
 }

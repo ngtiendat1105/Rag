@@ -1,0 +1,127 @@
+.docked {
+  display: flex;
+  min-block-size: 0;
+  border-inline-start: 1px solid var(--ui-line);
+  background: var(--ui-sidebar);
+}
+
+.panel {
+  display: flex;
+  width: 100%;
+  min-height: 0;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  min-height: var(--ui-header-height);
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 16px 8px 22px;
+  border-bottom: 1px solid var(--ui-line);
+}
+
+.header h2 {
+  font-size: 0.925rem;
+  font-weight: 650;
+}
+
+.content {
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 22px 20px;
+}
+
+.document {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.fileIcon {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  flex: none;
+  place-items: center;
+  border-radius: var(--ui-radius);
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.document h3 {
+  font-size: 1rem;
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+
+.document p {
+  margin-top: 2px;
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+}
+
+.excerpt {
+  margin-top: 18px;
+  padding: 13px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  font-size: 0.875rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+
+.actions .copyButton {
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+
+.actions .copyButton:hover {
+  background: var(--ui-hover);
+}
+
+.feedback {
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+}
+
+.feedback:not(:empty) {
+  margin-top: 10px;
+}
+
+.sheet {
+  position: fixed;
+  inset: auto 0 0;
+  width: min(100%, 620px);
+  max-width: none;
+  max-height: 75dvh;
+  margin: 0 auto;
+  overflow: hidden;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-lg) var(--ui-radius-lg) 0 0;
+  background: var(--ui-surface);
+  color: var(--ui-text);
+}
+
+.sheet[open] {
+  display: flex;
+}
+
+.sheet::backdrop {
+  background: rgb(15 23 42 / 45%);
+}
+
+.sheet .content {
+  padding-bottom: max(22px, env(safe-area-inset-bottom));
+}
