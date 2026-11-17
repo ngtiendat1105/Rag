@@ -10,6 +10,7 @@ interface ModalProps {
   children: ReactNode
   size?: 'sm' | 'md' | 'lg' | 'xl'
   showCloseButton?: boolean
+  tone?: 'dark' | 'light'
 }
 
 export default function Modal({
@@ -19,6 +20,7 @@ export default function Modal({
   children,
   size = 'md',
   showCloseButton = true,
+  tone = 'dark',
 }: ModalProps) {
   // Prevent scroll when modal is open
   useEffect(() => {
@@ -60,24 +62,25 @@ export default function Modal({
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.9, y: 20 }}
               className={clsx(
-                'w-full glass-effect rounded-2xl shadow-2xl',
+                'w-full rounded-2xl shadow-2xl',
+                tone === 'dark' ? 'glass-effect text-white' : 'bg-white text-slate-900',
                 sizes[size]
               )}
               onClick={(e) => e.stopPropagation()}
             >
               {/* Header */}
               {(title || showCloseButton) && (
-                <div className="flex items-center justify-between p-6 border-b border-dark-border">
+                <div className={`flex items-center justify-between p-6 border-b ${tone === 'dark' ? 'border-dark-border' : 'border-slate-200'}`}>
                   {title && (
-                    <h3 className="text-xl font-bold text-white">{title}</h3>
+                    <h3 className={`text-xl font-bold ${tone === 'dark' ? 'text-white' : 'text-slate-900'}`}>{title}</h3>
                   )}
                   
                   {showCloseButton && (
                     <button
                       onClick={onClose}
-                      className="p-2 rounded-lg hover:bg-dark-surface transition-colors"
+                      className={`p-2 rounded-lg transition-colors ${tone === 'dark' ? 'hover:bg-dark-surface' : 'hover:bg-slate-100'}`}
                     >
-                      <X className="w-5 h-5 text-gray-400" />
+                      <X className={`w-5 h-5 ${tone === 'dark' ? 'text-gray-400' : 'text-slate-400'}`} />
                     </button>
                   )}
                 </div>

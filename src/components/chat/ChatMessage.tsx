@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { 
   Copy, 
@@ -12,12 +12,18 @@ import {
   ExternalLink,
   User,
   Bot,
-  AlertCircle
+  AlertCircle,
+  ShieldCheck
 } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { formatDate } from '@/utils/formatters'
 import type { ChatAttachment, ChatReference } from '@/store/chatStore'
+import UserAvatar from '@/components/ui/UserAvatar'
+import { useAuthStore } from '@/store/authStore'
+import { useToast } from '@/components/ui/ToastProvider'
+import DocumentViewer from '@/components/chat/DocumentViewer'
+import DislikeFeedbackModal from '@/components/chat/DislikeFeedbackModal'
 
 interface ChatMessageProps {
   id: string
@@ -29,8 +35,10 @@ interface ChatMessageProps {
   confidence?: number
   attachments?: ChatAttachment[]
   rating?: 'like' | 'dislike' | null
-  onRate?: (rating: 'like' | 'dislike') => void
+  onRate?: (rating: 'like' | 'dislike', reason: string, detail?: string) => Promise<void>
   onCopy?: () => void
+  onRetry?: () => void
+  animate?: boolean
 }
 
 export default function ChatMessage({
@@ -45,40 +53,97 @@ export default function ChatMessage({
   rating = null,
   onRate,
   onCopy,
+  onRetry,
+  animate = false,
 }: ChatMessageProps) {
   const [copied, setCopied] = useState(false)
   const [showReferences, setShowReferences] = useState(false)
   const [selectedReference, setSelectedReference] = useState<ChatReference | null>(null)
   const [showFeedback, setShowFeedback] = useState(false)
   const [feedbackSent, setFeedbackSent] = useState(false)
+  const [pendingRating, setPendingRating] = useState<'like' | 'dislike' | null>(null)
+  const [feedbackError, setFeedbackError] = useState('')
+  const [referenceCopied, setReferenceCopied] = useState<number | null>(null)
+  const [viewerReference, setViewerReference] = useState<ChatReference | null>(null)
+  const [dislikeModalOpen, setDislikeModalOpen] = useState(false)
+  const currentUser = useAuthStore(state => state.user)
+  const { showToast } = useToast()
+  const [displayedContent, setDisplayedContent] = useState(animate && role === 'assistant' ? '' : content)
+
+  useEffect(() => {
+    if (!animate || role !== 'assistant') { setDisplayedContent(content); return }
+    setDisplayedContent('')
+    let index = 0
+    const timer = window.setInterval(() => {
+      index = Math.min(index + 2, content.length)
+      setDisplayedContent(content.slice(0, index))
+      if (index >= content.length) window.clearInterval(timer)
+    }, 12)
+    return () => window.clearInterval(timer)
+  }, [animate, content, role])
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(content)
-    setCopied(true)
-    onCopy?.()
-    
-    setTimeout(() => setCopied(false), 2000)
+    void navigator.clipboard.writeText(content).then(() => {
+      setCopied(true)
+      showToast('Đã sao chép câu trả lời.')
+      onCopy?.()
+      window.setTimeout(() => setCopied(false), 2000)
+    })
   }
 
   const isUser = role === 'user'
   const isAI = role === 'assistant'
   const isSystem = role === 'system'
   const isError = status === 'error'
+  const copyReference = async (item: ChatReference | { title: string }, index: number) => {
+    const citation = [item.title, 'page' in item && item.page ? `Trang ${item.page}` : '', 'excerpt' in item && item.excerpt ? item.excerpt : ''].filter(Boolean).join(' — ')
+    await navigator.clipboard.writeText(citation)
+    setReferenceCopied(index)
+    showToast('Đã sao chép nguồn tham khảo.')
+    window.setTimeout(() => setReferenceCopied(null), 2000)
+  }
+  const feedbackReasons = pendingRating === 'like'
+    ? ['Đúng và hữu ích', 'Nguồn rõ ràng', 'Dễ hiểu', 'Đúng nhu cầu']
+    : ['Sai nội dung', 'Thiếu nguồn', 'Khó hiểu', 'Không liên quan']
+  const activeRating = pendingRating || rating
+  const chooseRating = (nextRating: 'like' | 'dislike') => {
+    if (nextRating === 'dislike') {
+      setDislikeModalOpen(true)
+      return
+    }
+    setPendingRating(nextRating)
+    setShowFeedback(true)
+    setFeedbackSent(false)
+    setFeedbackError('')
+    showToast(nextRating === 'like' ? 'Hãy chọn lý do bạn thấy câu trả lời hữu ích.' : 'Hãy chọn lý do cần cải thiện.', 'info')
+  }
+  const submitFeedback = async (reason: string) => {
+    if (!pendingRating || !onRate) return
+    try {
+      await onRate(pendingRating, reason)
+      setFeedbackSent(true)
+      showToast('Đã ghi nhận đánh giá của bạn.')
+      setShowFeedback(false)
+      setPendingRating(null)
+    } catch (error) {
+      setFeedbackError(error instanceof Error ? error.message : 'Không thể gửi phản hồi.')
+    }
+  }
 
   const getMessageBg = () => {
     if (isUser) return 'bg-[#173f73] text-white shadow-sm'
-    if (isError) return 'bg-red-50 text-red-800 dark:bg-red-950/50 dark:text-red-100'
-    if (isAI) return 'bg-white text-slate-700 shadow-sm dark:bg-dark-surface dark:text-slate-100'
-    if (isSystem) return 'bg-amber-50 text-slate-700 dark:bg-amber-950/50 dark:text-amber-100'
-    return 'bg-white text-slate-700 dark:bg-dark-surface dark:text-slate-100'
+    if (isAI) return 'bg-white text-slate-700 shadow-sm'
+    if (isSystem) return 'bg-amber-50 text-slate-700'
+    if (isError) return 'bg-red-50 text-red-800'
+    return 'bg-white text-slate-700'
   }
 
   const getMessageBorder = () => {
     if (isUser) return 'border-[#173f73]'
-    if (isAI) return 'border-slate-200 dark:border-dark-border'
-    if (isSystem) return 'border-amber-200 dark:border-amber-800'
-    if (isError) return 'border-red-200 dark:border-red-800'
-    return 'border-slate-200 dark:border-dark-border'
+    if (isAI) return 'border-slate-200'
+    if (isSystem) return 'border-amber-200'
+    if (isError) return 'border-red-200'
+    return 'border-slate-200'
   }
 
   const getIcon = () => {
@@ -100,16 +165,16 @@ export default function ChatMessage({
         ${isUser ? 'bg-slate-200 text-slate-600' : 'bg-[#173f73] text-white'}
         ${isSystem && 'bg-amber-100 text-amber-700'}
         ${isError && 'bg-red-100 text-red-700'}`}>
-        {getIcon()}
+        {isUser ? <UserAvatar src={currentUser?.avatarUrl || currentUser?.avatar} name={currentUser?.name || 'Bạn'} size="md" className="h-9 w-9 bg-slate-200 text-slate-600" /> : getIcon()}
       </div>
 
       {/* Message Content */}
       <div className={`flex-1 ${isUser ? 'items-end' : 'items-start'}`}>
         <div className={`${isUser ? 'text-right' : 'text-left'} mb-1`}>
-          <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
+          <span className="font-semibold text-sm">
             {isUser ? 'Bạn' : isAI ? 'Legal AI Assistant' : 'Hệ thống'}
           </span>
-          <span className="text-xs text-slate-400 dark:text-slate-300 ml-2">
+          <span className="text-xs text-slate-400 ml-2">
             {formatDate(timestamp)}
             {status === 'sending' && ' • Đang gửi...'}
             {status === 'error' && ' • Lỗi'}
@@ -118,8 +183,8 @@ export default function ChatMessage({
 
         <div className={`${isUser ? 'flex-row-reverse' : 'flex-row'}`}>
           <div
-            className={`relative rounded-2xl p-4 border ${getMessageBg()} ${getMessageBorder()}
-              ${isUser ? 'rounded-br-sm' : 'rounded-bl-sm'} max-w-3xl`}
+            className={`relative inline-block w-fit max-w-[min(100%,48rem)] rounded-2xl border p-4 ${getMessageBg()} ${getMessageBorder()}
+              ${isUser ? 'rounded-br-sm' : 'rounded-bl-sm'}`}
           >
             {status === 'error' && (
               <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs px-2 py-1 rounded-full">
@@ -130,8 +195,15 @@ export default function ChatMessage({
             {/* Message content */}
             {isAI ? (
               <div className="markdown-content">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {content}
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    ul: ({ children }) => <ul>{children}</ul>,
+                    ol: ({ children }) => <ol>{children}</ol>,
+                    li: ({ children }) => <li>{children}</li>,
+                  }}
+                >
+                  {displayedContent}
                 </ReactMarkdown>
               </div>
             ) : (
@@ -143,21 +215,55 @@ export default function ChatMessage({
             )}
 
             {isAI && typeof confidence === 'number' && (
-              <div className={`mt-4 flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${confidence >= 75 ? 'bg-emerald-100 text-emerald-900 dark:bg-emerald-950/70 dark:text-emerald-100' : 'bg-amber-100 text-amber-900 dark:bg-amber-950/70 dark:text-amber-100'}`}>
-                <span className={`h-2 w-2 rounded-full ${confidence >= 75 ? 'bg-emerald-600 dark:bg-emerald-300' : 'bg-amber-600 dark:bg-amber-300'}`} />
-                Độ tin cậy {confidence}%{confidence < 75 && ' — nên kiểm tra lại nguồn trước khi sử dụng.'}
+              <div
+                className={`mt-4 w-full rounded-xl border px-3.5 py-3 ${
+                  confidence >= 75
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-amber-200 bg-amber-50 text-amber-900'
+                }`}
+                role="status"
+                aria-label={`Độ tin cậy ${confidence}%`}
+              >
+                <div className="flex items-start gap-3">
+                  <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full ${
+                    confidence >= 75 ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+                  }`}>
+                    {confidence >= 75
+                      ? <ShieldCheck className="h-4 w-4" aria-hidden="true" />
+                      : <AlertCircle className="h-4 w-4" aria-hidden="true" />}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
+                      <span className="text-sm font-semibold">Độ tin cậy câu trả lời</span>
+                      <span className="text-sm font-bold">{confidence}%</span>
+                    </div>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-black/10">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          confidence >= 75 ? 'bg-emerald-500' : 'bg-amber-500'
+                        }`}
+                        style={{ width: `${Math.max(0, Math.min(100, confidence))}%` }}
+                      />
+                    </div>
+                    <p className="mt-2 text-xs leading-5 opacity-90">
+                      {confidence >= 75
+                        ? 'Câu trả lời có mức đối chiếu tốt với các nguồn được cung cấp.'
+                        : 'Nên kiểm tra lại nguồn pháp lý trước khi sử dụng trong thực tế.'}
+                    </p>
+                  </div>
+                </div>
               </div>
             )}
 
             {/* References section */}
             {isAI && references.length > 0 && (
-              <div className="mt-4 pt-4">
+              <div className="mt-4 border-t border-slate-200 pt-4">
                 <button
                   onClick={() => setShowReferences(!showReferences)}
-                  className="flex items-center gap-2 rounded-lg bg-[#0b82d1] px-3 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-[#0869aa]"
+                  className="flex items-center gap-2 text-sm font-medium text-slate-600 transition-colors hover:text-[#173f73]"
                 >
                   <FileText className="w-4 h-4" />
-                  {showReferences ? 'Ẩn tài liệu tham khảo' : `Hiển thị ${references.length} tài liệu tham khảo`}
+                  {showReferences ? 'Ẩn nguồn tham khảo' : `Nguồn tham khảo (${references.length})`}
                 </button>
 
                 {showReferences && (
@@ -170,16 +276,17 @@ export default function ChatMessage({
                       const item = typeof ref === 'string' ? { title: ref } : ref
                       return <button
                         key={index}
-                        onClick={() => setSelectedReference(item)}
-                        className="flex w-full items-center gap-2 rounded-lg bg-dark-bg/50 p-3 text-left text-sm text-gray-300 hover:bg-dark-bg"
+                        onClick={() => { setSelectedReference(item); setViewerReference(item) }}
+                        className="flex w-full items-start gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-left text-sm text-slate-700 transition hover:border-[#173f73]/30 hover:bg-[#f3f7fb]"
                       >
-                        <ExternalLink className="w-3 h-3" />
-                        <span className="flex-1">{item.title}{item.page ? ` · Trang ${item.page}` : ''}</span>
+                        <ExternalLink className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[#173f73]" />
+                        <span className="min-w-0 flex-1"><span className="block font-medium">{item.title}</span>{item.page && <span className="mt-1 block text-xs text-slate-500">Trang {item.page}</span>}{item.excerpt && <span className="mt-1 block line-clamp-2 text-xs text-slate-500">{item.excerpt}</span>}</span>
+                        <span onClick={(event) => { event.stopPropagation(); void copyReference(item, index) }} className="rounded-md px-2 py-1 text-[11px] text-slate-500 hover:bg-white hover:text-[#173f73]">{referenceCopied === index ? 'Đã chép' : 'Sao chép'}</span>
                       </button>
                     })}
                   </motion.div>
                 )}
-                {selectedReference && <div className="mt-3 rounded-xl border border-accent-500/20 bg-accent-500/5 p-3 text-sm"><div className="mb-1 flex items-center justify-between"><strong>{selectedReference.title}</strong><button aria-label="Đóng nguồn" onClick={() => setSelectedReference(null)}><X className="h-4 w-4" /></button></div>{selectedReference.page && <p className="text-xs text-gray-400">Trang {selectedReference.page}</p>}<p className="mt-2 text-gray-300">{selectedReference.excerpt || 'Bản xem trước chưa có sẵn cho tài liệu này.'}</p></div>}
+                {selectedReference && <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-slate-700"><div className="mb-1 flex items-center justify-between"><strong>{selectedReference.title}</strong><button aria-label="Đóng nguồn" onClick={() => setSelectedReference(null)}><X className="h-4 w-4" /></button></div>{selectedReference.page && <p className="text-xs text-slate-500">Trang {selectedReference.page}</p>}<p className="mt-2 leading-6">{selectedReference.excerpt || 'Bản xem trước chưa có sẵn cho tài liệu này.'}</p></div>}
               </div>
             )}
           </div>
@@ -204,16 +311,16 @@ export default function ChatMessage({
               </button>
 
               <button
-                onClick={() => onRate?.('like')}
-                className={`p-2 rounded-lg transition-colors ${rating === 'like' ? 'bg-green-500/20 text-green-400' : 'hover:bg-dark-surface text-gray-400'}`}
+                onClick={() => chooseRating('like')}
+                className={`p-2 rounded-lg transition-colors ${activeRating === 'like' ? 'text-green-500' : 'hover:bg-dark-surface text-gray-400'}`}
                 title="Thích"
               >
                 <ThumbsUp className="w-4 h-4" />
               </button>
 
               <button
-                onClick={() => { onRate?.('dislike'); setShowFeedback(true); setFeedbackSent(false) }}
-                className={`p-2 rounded-lg transition-colors ${rating === 'dislike' ? 'bg-red-500/20 text-red-400' : 'hover:bg-dark-surface text-gray-400'}`}
+                onClick={() => chooseRating('dislike')}
+                className={`p-2 rounded-lg transition-colors ${activeRating === 'dislike' ? 'text-green-500' : 'hover:bg-dark-surface text-gray-400'}`}
                 title="Không thích"
               >
                 <ThumbsDown className="w-4 h-4" />
@@ -221,11 +328,23 @@ export default function ChatMessage({
             </motion.div>
           )}
           {isAI && showFeedback && !feedbackSent && (
-            <div className="mt-2 rounded-xl border border-white/10 bg-dark-surface/70 p-3 text-sm"><p className="mb-2 text-gray-300">Câu trả lời cần cải thiện ở điểm nào?</p><div className="flex flex-wrap gap-2">{['Sai nội dung', 'Thiếu nguồn', 'Khó hiểu', 'Không liên quan'].map(reason => <button key={reason} onClick={() => { setFeedbackSent(true); setShowFeedback(false) }} className="rounded-lg border border-white/10 px-3 py-1.5 text-gray-300 hover:bg-white/5">{reason}</button>)}</div></div>
+            <div className="mt-2 rounded-xl border border-slate-200 bg-white p-3 text-sm shadow-sm"><p className="mb-2 font-medium text-slate-700">{pendingRating === 'like' ? 'Điều gì làm câu trả lời hữu ích?' : 'Câu trả lời cần cải thiện ở điểm nào?'}</p><div className="flex flex-wrap gap-2">{feedbackReasons.map(reason => <button key={reason} onClick={() => void submitFeedback(reason)} className="rounded-lg border border-slate-200 px-3 py-1.5 text-slate-600 transition hover:border-[#173f73]/40 hover:bg-[#f3f7fb]">{reason}</button>)}</div>{feedbackError && <p className="mt-2 text-xs text-red-600">{feedbackError}</p>}</div>
           )}
-          {isAI && feedbackSent && <p className="mt-2 text-xs text-green-400">Đã ghi nhận phản hồi. Cảm ơn bạn.</p>}
+          {isError && onRetry && <button onClick={onRetry} className="mt-2 inline-flex items-center rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 transition hover:bg-red-50">Thử lại câu hỏi</button>}
+          {isAI && feedbackSent && <p className="mt-2 text-sm font-medium text-green-600">Cảm ơn bạn đã đánh giá.</p>}
         </div>
       </div>
+      <DislikeFeedbackModal
+        open={dislikeModalOpen}
+        onClose={() => setDislikeModalOpen(false)}
+        onSubmit={async (reason, detail) => {
+          if (!onRate) return
+          await onRate('dislike', reason, detail)
+          setFeedbackSent(true)
+          showToast('Đã ghi nhận phản hồi cải thiện.')
+        }}
+      />
+      <DocumentViewer reference={viewerReference} onClose={() => { setViewerReference(null); setSelectedReference(null) }} />
     </motion.div>
   )
 }

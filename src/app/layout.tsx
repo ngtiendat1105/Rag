@@ -1,5 +1,7 @@
 ﻿import type { Metadata, Viewport } from "next"
 import "../styles/globals.css"
+import { ToastProvider } from "@/components/ui/ToastProvider"
+import PresenceHeartbeat from "@/components/auth/PresenceHeartbeat"
 
 
 export const metadata: Metadata = {
@@ -22,7 +24,10 @@ export default function RootLayout({
     <html lang="vi" className="dark">
       <body className="font-sans bg-dark-bg text-white">
         <div className="min-h-screen relative overflow-hidden">
-          {children}
+          <ToastProvider>
+            <PresenceHeartbeat />
+            {children}
+          </ToastProvider>
         </div>
       </body>
     </html>

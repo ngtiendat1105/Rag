@@ -84,12 +84,10 @@ METADATA_KEYS_FOR_FILTERING = [
     "status"
 ]
 
-# Bộ lọc mặc định: luôn ưu tiên chunk đã kiểm chứng và có trọng số cao
-# Lưu ý: weight sử dụng integer thay vì float để tương thích với Qdrant MatchValue
-DEFAULT_FILTER_CONDITIONS = {
-    "is_verified": True,
-    "weight": 1
-}
+# Không lọc cứng theo trạng thái kiểm chứng khi retrieval mặc định.
+# Tài liệu chưa có cờ is_verified vẫn phải được tìm thấy để pipeline có thể
+# trả lời kèm cảnh báo đối chiếu thay vì âm thầm trả về 0 kết quả.
+DEFAULT_FILTER_CONDITIONS = {}
 
 # Ngưỡng similarity tối thiểu (cosine similarity)
 MIN_SIMILARITY_THRESHOLD = settings.rag_similarity_threshold

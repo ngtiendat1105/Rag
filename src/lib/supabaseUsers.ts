@@ -11,6 +11,7 @@ export interface AppUser {
   avatarUrl: string | null
   status: AppUserStatus
   lastActive: string | null
+  createdAt: string | null
 }
 
 interface SupabaseUserRow {
@@ -23,6 +24,7 @@ interface SupabaseUserRow {
   avatar_url: string | null
   status: AppUserStatus
   last_active: string | null
+  created_at?: string | null
 }
 
 function config() {
@@ -69,6 +71,7 @@ const mapUser = (row: SupabaseUserRow): AppUser => ({
   avatarUrl: row.avatar_url,
   status: row.status,
   lastActive: row.last_active,
+  createdAt: row.created_at || null,
 })
 
 export async function authenticateUser(email: string, password: string): Promise<AppUser | null> {
@@ -85,7 +88,7 @@ export async function findUserByEmail(email: string): Promise<AppUser | null> {
 }
 
 export async function listUsers(): Promise<AppUser[]> {
-  const rows = await request('/app_users?select=id,name,email,role,department,status,last_active&order=created_at.desc') as SupabaseUserRow[]
+  const rows = await request('/app_users?select=id,name,email,role,department,status,last_active,created_at&order=created_at.desc') as SupabaseUserRow[]
   return rows.map(mapUser)
 }
 
@@ -110,6 +113,14 @@ export async function updateUser(id: string, input: Partial<Pick<AppUser, 'name'
 export async function getUserById(id: string): Promise<AppUser | null> {
   const rows = await request(`/app_users?select=id,name,email,role,department,phone,avatar_url,status,last_active&id=eq.${encodeURIComponent(id)}&limit=1`) as SupabaseUserRow[]
   return rows[0] ? mapUser(rows[0]) : null
+}
+
+export async function touchUserActivity(id: string): Promise<void> {
+  await request(`/app_users?id=eq.${encodeURIComponent(id)}`, {
+    method: 'PATCH',
+    headers: { Prefer: 'return=minimal' },
+    body: JSON.stringify({ last_active: new Date().toISOString() }),
+  })
 }
 
 export async function updateProfile(

@@ -30,7 +30,7 @@ export default function ProfilePage() {
         if (!response.ok) throw new Error(data.message || 'Không thể tải hồ sơ.')
         const profile = data.user as AuthUser & { avatarUrl?: string | null }
         setForm({ name: profile.name, phone: profile.phone || '', avatarUrl: profile.avatarUrl || profile.avatar || '' })
-        setUser({ ...profile, avatar: profile.avatarUrl || profile.avatar })
+        setUser({ ...profile, avatar: profile.avatarUrl || profile.avatar, avatarUrl: profile.avatarUrl || profile.avatar })
       })
       .catch(err => setError(err instanceof Error ? err.message : 'Không thể tải hồ sơ.'))
       .finally(() => setLoading(false))
@@ -62,7 +62,7 @@ export default function ProfilePage() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Không thể lưu hồ sơ.')
       const profile = data.user as AuthUser & { avatarUrl?: string | null }
-      setUser({ ...profile, avatar: profile.avatarUrl || undefined })
+      setUser({ ...profile, avatar: profile.avatarUrl || undefined, avatarUrl: profile.avatarUrl || null })
       setForm({ name: profile.name, phone: profile.phone || '', avatarUrl: profile.avatarUrl || '' })
       setMessage('Hồ sơ đã được cập nhật.')
     } catch (err) {
@@ -73,7 +73,7 @@ export default function ProfilePage() {
   }
 
   if (!hydrated || !isAuthenticated || !user || loading) {
-    return <div className="min-h-screen flex items-center justify-center"><div className="spinner w-12 h-12" /></div>
+    return <main className="min-h-screen bg-dark-bg p-4 md:p-8"><div className="mx-auto max-w-2xl animate-pulse rounded-2xl border border-white/10 bg-white/5 p-6 md:p-8"><div className="mb-8 h-8 w-48 rounded bg-white/10" /><div className="mb-8 h-4 w-80 max-w-full rounded bg-white/10" /><div className="mb-8 flex items-center gap-5"><div className="h-24 w-24 rounded-full bg-white/10" /><div className="h-10 w-36 rounded-lg bg-white/10" /></div><div className="space-y-5"><div className="h-12 rounded-xl bg-white/10" /><div className="h-12 rounded-xl bg-white/10" /><div className="h-12 rounded-xl bg-white/10" /></div></div></main>
   }
 
   return (

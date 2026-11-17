@@ -162,25 +162,27 @@ export default function DashboardStats() {
           ))}
         </div>
 
-        {/* Stats summary */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-8 pt-6 border-t border-dark-border">
-          <div className="text-center">
-            <div className="text-2xl font-bold gradient-text">89%</div>
-            <div className="text-sm text-gray-400">User hài lòng</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold gradient-text">24/7</div>
-            <div className="text-sm text-gray-400">Thời gian hoạt động</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold gradient-text">99.5%</div>
-            <div className="text-sm text-gray-400">Độ chính xác</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold gradient-text">3.8s</div>
-            <div className="text-sm text-gray-400">Phản hồi trung bình</div>
-          </div>
-        </div>
+      </div>
+
+      {/* System summary */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[
+          { value: '89%', label: 'User hài lòng' },
+          { value: '24/7', label: 'Thời gian hoạt động' },
+          { value: '99.5%', label: 'Độ chính xác' },
+          { value: '3.8s', label: 'Phản hồi trung bình' },
+        ].map((item, index) => (
+          <motion.div
+            key={item.label}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.35 + index * 0.08 }}
+            className="rounded-xl border border-dark-border bg-dark-surface/70 p-4 shadow-sm sm:p-6"
+          >
+            <div className="text-2xl font-bold gradient-text">{item.value}</div>
+            <div className="mt-1 text-sm text-gray-400">{item.label}</div>
+          </motion.div>
+        ))}
       </div>
 
       {/* Recent Activity */}
@@ -236,30 +238,53 @@ export default function DashboardStats() {
           
           <div className="space-y-4">
             {[
-              { topic: 'Nghỉ phép năm', count: 324, trend: 'up' },
-              { topic: 'Hợp đồng lao động', count: 287, trend: 'up' },
-              { topic: 'Bảo hiểm xã hội', count: 245, trend: 'stable' },
-              { topic: 'Chính sách lương', count: 198, trend: 'down' },
-              { topic: 'Quy định nội bộ', count: 176, trend: 'up' },
+              { topic: 'Nghỉ phép năm', count: 324, trend: 'up', change: '+18.4%', success: '96%', bars: [35, 44, 42, 58, 64, 78] },
+              { topic: 'Hợp đồng lao động', count: 287, trend: 'up', change: '+12.1%', success: '94%', bars: [38, 42, 48, 52, 61, 70] },
+              { topic: 'Bảo hiểm xã hội', count: 245, trend: 'stable', change: '0.0%', success: '91%', bars: [52, 48, 51, 50, 52, 51] },
+              { topic: 'Chính sách lương', count: 198, trend: 'down', change: '-4.8%', success: '88%', bars: [68, 64, 61, 55, 51, 46] },
+              { topic: 'Quy định nội bộ', count: 176, trend: 'up', change: '+7.6%', success: '93%', bars: [30, 36, 41, 47, 45, 59] },
             ].map((item, index) => (
-              <div key={index} className="flex items-center justify-between p-3 rounded-lg hover:bg-dark-surface/50 transition-colors">
-                <div className="flex items-center gap-3">
+              <div key={index} className="flex items-center justify-between gap-4 rounded-lg p-3 transition-colors hover:bg-dark-surface/50">
+                <div className="flex min-w-0 items-center gap-3">
                   <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-primary-500/20 to-secondary-500/20 
                     flex items-center justify-center">
                     <span className="font-bold">{index + 1}</span>
                   </div>
                   
-                  <div>
-                    <p className="font-medium">{item.topic}</p>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">{item.topic}</p>
                     <p className="text-sm text-gray-400">{item.count} lượt hỏi</p>
                   </div>
                 </div>
                 
-                <div className={`flex items-center gap-1 ${item.trend === 'up' ? 'text-green-400' : 
-                  item.trend === 'down' ? 'text-red-400' : 'text-yellow-400'}`}>
-                  {item.trend === 'up' ? <ArrowUpRight className="w-4 h-4" /> :
-                   item.trend === 'down' ? <ArrowDownRight className="w-4 h-4" /> :
-                   <span className="w-4 h-4 flex items-center justify-center">●</span>}
+                <div className="hidden shrink-0 items-center gap-4 sm:flex">
+                  <div className="flex h-6 items-end gap-0.5" aria-label={`Xu hướng ${item.topic}`}>
+                    {item.bars.map((height, barIndex) => (
+                      <span
+                        key={barIndex}
+                        className={`w-1 rounded-full ${item.trend === 'down' ? 'bg-red-400/70' : item.trend === 'stable' ? 'bg-yellow-400/70' : 'bg-green-400/70'}`}
+                        style={{ height: `${height}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-right">
+                    <p className={`text-sm font-semibold ${item.trend === 'up' ? 'text-green-400' : item.trend === 'down' ? 'text-red-400' : 'text-yellow-400'}`}>
+                      {item.change}
+                    </p>
+                    <p className="text-xs text-gray-500">Tỷ lệ đúng {item.success}</p>
+                  </div>
+                  <div className={`flex items-center gap-1 ${item.trend === 'up' ? 'text-green-400' : item.trend === 'down' ? 'text-red-400' : 'text-yellow-400'}`}>
+                    {item.trend === 'up' ? <ArrowUpRight className="h-4 w-4" /> :
+                     item.trend === 'down' ? <ArrowDownRight className="h-4 w-4" /> :
+                     <span className="flex h-4 w-4 items-center justify-center">●</span>}
+                  </div>
+                </div>
+
+                <div className="flex shrink-0 flex-col items-end gap-1 sm:hidden">
+                  <span className={`text-xs font-semibold ${item.trend === 'up' ? 'text-green-400' : item.trend === 'down' ? 'text-red-400' : 'text-yellow-400'}`}>
+                    {item.change}
+                  </span>
+                  <span className="text-[11px] text-gray-500">{item.success} đúng</span>
                 </div>
               </div>
             ))}

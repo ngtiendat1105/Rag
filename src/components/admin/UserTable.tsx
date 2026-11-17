@@ -21,7 +21,11 @@ import Button from '@/components/ui/Button'
 import Modal from '@/components/ui/Modal'
 import type { AppUser as User } from '@/lib/supabaseUsers'
 
-export default function UserTable() {
+interface UserTableProps {
+  onUsersChange?: (users: User[]) => void
+}
+
+export default function UserTable({ onUsersChange }: UserTableProps) {
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedRole, setSelectedRole] = useState<string>('all')
   const [selectedStatus, setSelectedStatus] = useState<string>('all')
@@ -41,8 +45,9 @@ export default function UserTable() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message)
       setUsers(data.users)
+      onUsersChange?.(data.users)
     }).catch(error => setOperationError(error.message || 'Không thể tải người dùng.')).finally(() => setLoading(false))
-  }, [])
+  }, [onUsersChange])
 
   const filteredUsers = users.filter(user => {
     const matchesSearch = 
@@ -105,6 +110,7 @@ export default function UserTable() {
         const data = response.status === 204 ? null : await response.json()
         if (!response.ok) throw new Error(data?.message || 'Không thể xóa người dùng.')
         setUsers(current => current.filter(user => user.id !== selectedUser.id))
+        onUsersChange?.(users.filter(user => user.id !== selectedUser.id))
         setShowDeleteModal(false)
         setSelectedUser(null)
       } catch (error) { setOperationError(error instanceof Error ? error.message : 'Không thể xóa người dùng.') }
@@ -132,6 +138,7 @@ export default function UserTable() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Không thể tạo tài khoản.')
       setUsers(current => [data.user, ...current])
+      onUsersChange?.([data.user, ...users])
       setNewUser({ name: '', email: '', password: '', role: 'user', department: 'Phòng Pháp chế' })
       setShowAddModal(false)
     } catch (error) { setAddError(error instanceof Error ? error.message : 'Không thể tạo tài khoản.') }
@@ -145,6 +152,7 @@ export default function UserTable() {
       const data = await response.json()
       if (!response.ok) throw new Error(data.message || 'Không thể cập nhật người dùng.')
       setUsers(current => current.map(user => user.id === selectedUser.id ? data.user : user))
+      onUsersChange?.(users.map(user => user.id === selectedUser.id ? data.user : user))
       setShowEditModal(false)
       setSelectedUser(null)
     } catch (error) { setOperationError(error instanceof Error ? error.message : 'Không thể cập nhật người dùng.') }
@@ -308,7 +316,12 @@ export default function UserTable() {
                   </td>
                 </motion.tr>
               ))}
-              {loading && <tr><td colSpan={6} className="p-10 text-center text-gray-400">Đang tải người dùng từ Supabase...</td></tr>}
+              {loading && Array.from({ length: 4 }).map((_, index) => (
+                <tr key={index} className="border-b border-dark-border">
+                  <td colSpan={6} className="p-4"><div className="h-12 animate-pulse rounded-xl bg-dark-surface" /></td>
+                </tr>
+              ))}
+              {!loading && !filteredUsers.length && <tr><td colSpan={6} className="p-12 text-center"><UserIcon className="mx-auto mb-3 h-8 w-8 text-gray-500" /><p className="text-gray-300">Không tìm thấy người dùng phù hợp.</p><p className="mt-1 text-sm text-gray-500">Thử đổi từ khóa hoặc bộ lọc.</p></td></tr>}
             </tbody>
           </table>
         </div>
