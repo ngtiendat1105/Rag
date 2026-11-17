@@ -1,7 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import { SAMPLE_CHATS, DEMO_MESSAGES } from '@/utils/constants'
-import { generateChatId } from '@/utils/formatters'
+import { generateChatId, truncateText } from '@/utils/formatters'
 import { ContentModerationError, moderateChatContent } from '@/utils/contentModeration'
 import { ragChatService } from '@/services/ragChatService'
 
@@ -67,13 +66,11 @@ interface ChatState {
   searchChats: (query: string) => Chat[]
 }
 
+const NEW_CHAT_TITLE = 'Cuộc trò chuyện mới'
+
 export const useChatStore = create<ChatState>()(persist((set, get) => ({
-  chats: SAMPLE_CHATS.map(chat => ({
-    ...chat,
-    messages: chat.id === 'chat_1' ? DEMO_MESSAGES : [],
-  })) as Chat[],
-  
-  activeChatId: 'chat_1',
+  chats: [],
+  activeChatId: null,
   isTyping: false,
   isLoading: false,
   processingStage: '',
@@ -85,7 +82,7 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
   createNewChat: (title?: string) => {
     const safeTitle = typeof title === 'string' && title.trim()
       ? title.trim()
-      : 'Cuộc trò chuyện mới'
+      : NEW_CHAT_TITLE
     const newChat: Chat = {
       id: generateChatId(),
       title: safeTitle,
@@ -105,18 +102,19 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
   },
 
   sendMessage: async (content: string, attachments = [], files = []) => {
-    const { activeChatId, chats } = get()
-    if (!activeChatId || !content.trim()) return
+    const question = content.trim()
+    if (!question || get().isTyping) return
 
-    const moderation = moderateChatContent(content)
+    const moderation = moderateChatContent(question)
     if (!moderation.allowed) {
       throw new ContentModerationError(moderation.message || 'Nội dung không phù hợp.')
     }
 
+    const activeChatId = get().activeChatId ?? get().createNewChat().id
     const userMessage: Message = {
       id: `msg_${Date.now()}_user`,
       role: 'user',
-      content: content.trim(),
+      content: question,
       timestamp: new Date().toISOString(),
       status: 'sending' as const,
       attachments,
@@ -128,7 +126,10 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
         chat.id === activeChatId
           ? {
               ...chat,
-              lastMessage: content,
+              title: chat.messages.length === 0 && chat.title === NEW_CHAT_TITLE
+                ? truncateText(question.replace(/\s+/g, ' '), 80)
+                : chat.title,
+              lastMessage: question,
               timestamp: userMessage.timestamp,
               messages: [...chat.messages, userMessage],
             }
@@ -144,7 +145,7 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
 
     try {
       set({ processingStage: 'Đang truy xuất và tổng hợp từ kho tài liệu...' })
-      const ragResponse = await ragChatService.sendQueryToRAG(content, undefined, { signal: requestController.signal, files })
+      const ragResponse = await ragChatService.sendQueryToRAG(question, undefined, { signal: requestController.signal, files })
       const aiResponse: Message = {
         id: ragResponse.id,
         role: 'assistant',
@@ -211,14 +212,14 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
   retryMessage: async (messageId: string) => {
     const { activeChatId, chats } = get()
     const chat = chats.find(item => item.id === activeChatId)
-    if (!chat) return
+    if (!chat || get().isTyping) return
     const failedIndex = chat.messages.findIndex(message => message.id === messageId)
     const previous = failedIndex > 0 ? chat.messages[failedIndex - 1] : undefined
-    if (!previous || previous.role !== 'user') return
+    if (!previous || previous.role !== 'user' || previous.attachments?.length) return
     set(state => ({
       chats: state.chats.map(item => item.id === activeChatId ? { ...item, messages: item.messages.filter(message => message.id !== messageId) } : item),
     }))
-    await get().sendMessage(previous.content, previous.attachments)
+    await get().sendMessage(previous.content)
   },
 
   archiveChat: (chatId: string) => {
@@ -245,6 +246,16 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
     const { activeChatId } = get()
     if (!activeChatId) return
 
+    const response = await fetch('/api/feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, rating, reason, detail, messageContent: content }),
+    })
+    if (!response.ok) {
+      const data = await response.json().catch(() => ({})) as { message?: string }
+      throw new Error(data.message || 'Không thể gửi phản hồi.')
+    }
+
     set(state => ({
       chats: state.chats.map(chat =>
         chat.id === activeChatId
@@ -259,15 +270,6 @@ export const useChatStore = create<ChatState>()(persist((set, get) => ({
           : chat
       ),
     }))
-    const response = await fetch('/api/feedback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ messageId, rating, reason, detail, messageContent: content }),
-    })
-    if (!response.ok) {
-      const data = await response.json().catch(() => ({})) as { message?: string }
-      throw new Error(data.message || 'Không thể gửi feedback đến quản trị viên.')
-    }
   },
 
   clearChat: (chatId: string) => {
