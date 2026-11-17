@@ -15,7 +15,7 @@ frontend:
         - env | grep -e AUTH_SESSION_SECRET >> .env.production
         - env | grep -e RESEND_API_KEY >> .env.production
         - env | grep -e RESEND_FROM_EMAIL >> .env.production
-        - npm run build
+        - NEXT_DIST_DIR=.next npm exec --offline -- next build
   artifacts:
     baseDirectory: .next
     files:
