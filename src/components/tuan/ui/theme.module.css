@@ -1,0 +1,96 @@
+.theme {
+  color-scheme: light;
+  --ui-canvas: #f8f7f3;
+  --ui-sidebar: #eeede7;
+  --ui-surface: #fffefa;
+  --ui-subtle: #f4f3ed;
+  --ui-hover: #e8e8e1;
+  --ui-line: #dedfd6;
+  --ui-text: #182638;
+  --ui-muted: #546170;
+  --ui-primary: #1e3854;
+  --ui-primary-hover: #284b70;
+  --ui-on-primary: #fffefa;
+  --ui-selected: #e3e9ee;
+  --ui-accent: #79521e;
+  --ui-accent-surface: #f4ead9;
+  --ui-danger: #a02d32;
+  --ui-danger-surface: #f9e7e6;
+  --ui-focus: #305e91;
+  --ui-shadow: 0 8px 24px rgb(24 38 56 / 7%);
+  --ui-radius: 12px;
+  --ui-radius-lg: 18px;
+}
+
+.theme[data-theme='dark'] {
+  color-scheme: dark;
+  --ui-canvas: #151e29;
+  --ui-sidebar: #101824;
+  --ui-surface: #1c2938;
+  --ui-subtle: #223144;
+  --ui-hover: #26384d;
+  --ui-line: #38495d;
+  --ui-text: #eef1f6;
+  --ui-muted: #b3bfce;
+  --ui-primary: #bad3ee;
+  --ui-primary-hover: #d4e5f8;
+  --ui-on-primary: #142639;
+  --ui-selected: #293e56;
+  --ui-accent: #ebc995;
+  --ui-accent-surface: #403325;
+  --ui-danger: #ffc4c7;
+  --ui-danger-surface: #472c37;
+  --ui-focus: #9bc7fb;
+  --ui-shadow: 0 8px 24px rgb(0 0 0 / 22%);
+}
+
+.theme :where(button, a, summary, textarea, input):focus-visible {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 3px;
+}
+
+.iconButton,
+.actionButton,
+.primaryButton {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  border-radius: var(--ui-radius);
+  font-size: 0.8125rem;
+  font-weight: 600;
+}
+
+.iconButton {
+  width: 44px;
+  flex: none;
+  color: var(--ui-muted);
+}
+
+.actionButton {
+  padding-inline: 12px;
+  color: var(--ui-text);
+}
+
+.iconButton:hover,
+.actionButton:hover {
+  background: var(--ui-hover);
+}
+
+.primaryButton {
+  gap: 10px;
+  padding-inline: 14px;
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+}
+
+.primaryButton:hover:not(:disabled) {
+  background: var(--ui-primary-hover);
+}
+
+.primaryButton:disabled {
+  cursor: not-allowed;
+  background: var(--ui-hover);
+  color: var(--ui-muted);
+}

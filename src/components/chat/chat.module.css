@@ -1,0 +1,505 @@
+.sidebar {
+  display: flex;
+  height: 100%;
+  flex-direction: column;
+  background: var(--ui-sidebar);
+}
+
+.sidebarHeader {
+  display: grid;
+  flex: none;
+  gap: 12px;
+  padding: 18px 16px 6px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.brand strong {
+  display: block;
+  font-size: 1.0625rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+.brand p {
+  margin-top: 3px;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.brandIcon,
+.assistantIcon {
+  display: grid;
+  flex: none;
+  place-items: center;
+  border-radius: var(--ui-radius);
+  background: var(--ui-primary);
+  color: var(--ui-on-primary);
+}
+
+.brandIcon {
+  width: 42px;
+  height: 42px;
+}
+
+.sidebar .newChat {
+  justify-content: flex-start;
+  text-align: left;
+}
+
+.searchField {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding-inline: 11px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-muted);
+}
+
+.searchField:focus-within {
+  outline: 2px solid var(--ui-focus);
+  outline-offset: 2px;
+}
+
+.searchField svg {
+  flex: none;
+}
+
+.searchField input {
+  width: 100%;
+  min-width: 0;
+  align-self: stretch;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 0.875rem;
+}
+
+.searchField input:focus-visible {
+  outline: none;
+}
+
+.searchField input::placeholder,
+.composer textarea::placeholder {
+  color: var(--ui-muted);
+  opacity: 1;
+}
+
+.history {
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: 7px 12px 16px;
+}
+
+.historyHeading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 7px;
+}
+
+.historyHeading h2 {
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.historyEmpty {
+  padding: 7px;
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+  line-height: 1.55;
+}
+
+.historyList {
+  display: grid;
+  gap: 3px;
+  list-style: none;
+}
+
+.historyRow {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  border-radius: var(--ui-radius);
+}
+
+.historyRow:hover {
+  background: var(--ui-hover);
+}
+
+.historyRow[data-active='true'] {
+  background: var(--ui-selected);
+}
+
+.historySelect {
+  display: flex;
+  min-width: 0;
+  min-height: 52px;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  border-radius: var(--ui-radius);
+  text-align: left;
+}
+
+.historySelect svg {
+  flex: none;
+  color: var(--ui-muted);
+}
+
+.historySelect > span {
+  min-width: 0;
+}
+
+.historySelect strong {
+  display: block;
+  overflow: hidden;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.historySelect small {
+  display: block;
+  margin-top: 2px;
+  color: var(--ui-muted);
+  font-size: 0.6875rem;
+}
+
+.historyActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+}
+
+.historyActions .deleteAction {
+  color: var(--ui-danger);
+}
+
+.composer {
+  overflow: hidden;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+}
+
+.composer:focus-within {
+  border-color: var(--ui-focus);
+}
+
+.composer textarea {
+  display: block;
+  width: 100%;
+  min-height: 57px;
+  max-height: min(140px, 28dvh);
+  resize: none;
+  padding: 15px 15px 6px;
+  background: transparent;
+  color: var(--ui-text);
+  font-size: 1rem;
+  line-height: 1.55;
+}
+
+.composer textarea:focus-visible {
+  outline: none;
+}
+
+.composerError {
+  margin: 4px 15px;
+  color: var(--ui-danger);
+  font-size: 0.875rem;
+}
+
+.composerControls {
+  display: flex;
+  min-height: 54px;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  padding: 0 7px 7px 15px;
+}
+
+.keyboardHint,
+.characterCount,
+.composerNotice {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.keyboardHint {
+  margin-right: auto;
+}
+
+.composerNotice {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  padding-top: 9px;
+  text-align: center;
+}
+
+.message {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.message[data-role='user'] {
+  justify-content: flex-end;
+}
+
+.assistantIcon {
+  width: 34px;
+  height: 34px;
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.messageBody {
+  min-width: 0;
+  flex: 1;
+}
+
+.message[data-role='user'] .messageBody {
+  max-width: 85%;
+  flex: 0 1 auto;
+}
+
+.messageMeta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 3px 8px;
+  margin: 4px 0 6px;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.messageMeta strong {
+  color: var(--ui-text);
+  font-size: 0.875rem;
+}
+
+.message[data-role='user'] .messageMeta {
+  justify-content: flex-end;
+}
+
+.messageContent {
+  padding: 14px 16px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-surface);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+
+.message[data-role='user'] .messageContent {
+  background: var(--ui-selected);
+}
+
+.message .messageContent[data-status='error'] {
+  background: var(--ui-danger-surface);
+  color: var(--ui-danger);
+}
+
+.markdown > * + * {
+  margin-top: 0.8em;
+}
+
+.markdown :is(h1, h2, h3, h4) {
+  color: var(--ui-primary);
+  font-size: 1.07em;
+  font-weight: 700;
+}
+
+.markdown ul,
+.markdown ol {
+  padding-inline-start: 1.4em;
+}
+
+.markdown ul {
+  list-style: disc;
+}
+
+.markdown ol {
+  list-style: decimal;
+}
+
+.markdown li + li {
+  margin-top: 0.25em;
+}
+
+.markdown blockquote {
+  padding: 8px 12px;
+  border-left: 3px solid var(--ui-accent);
+  border-radius: 4px;
+  background: var(--ui-accent-surface);
+  color: var(--ui-accent);
+}
+
+.markdown a {
+  color: var(--ui-primary);
+  text-decoration: underline;
+}
+
+.markdown pre,
+.markdown table {
+  display: block;
+  max-width: 100%;
+  overflow-x: auto;
+  border-radius: 8px;
+  background: var(--ui-subtle);
+}
+
+.markdown pre,
+.markdown :is(th, td) {
+  padding: 8px 10px;
+}
+
+.markdown :is(td, th) {
+  border: 1px solid var(--ui-line);
+}
+
+.attachmentList {
+  display: grid;
+  gap: 5px;
+  margin-top: 8px;
+  list-style: none;
+}
+
+.attachmentList li {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.references {
+  display: grid;
+  gap: 6px;
+  padding-top: 12px;
+  margin-top: 14px;
+  border-top: 1px solid var(--ui-line);
+}
+
+.references > p {
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+  font-weight: 650;
+}
+
+.reference {
+  padding-inline: 10px;
+  border-radius: var(--ui-radius);
+  background: var(--ui-subtle);
+  font-size: 0.8125rem;
+}
+
+.reference > summary {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.reference > summary::-webkit-details-marker {
+  display: none;
+}
+
+.reference > summary svg {
+  flex: none;
+  color: var(--ui-muted);
+}
+
+.reference > summary span {
+  flex: 1;
+}
+
+.reference > p {
+  padding: 0 0 10px 24px;
+  color: var(--ui-muted);
+}
+
+.messageActions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 4px;
+}
+
+.messageActions span {
+  margin-left: 4px;
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.sidebar button[aria-pressed='true'],
+.messageActions button[aria-pressed='true'] {
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+}
+
+.loading {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-muted);
+  font-size: 0.875rem;
+}
+
+.loadingDot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--ui-accent);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .loadingDot {
+    animation: pulse 1.6s ease-in-out infinite;
+  }
+}
+
+@keyframes pulse {
+  50% { opacity: 0.32; }
+}
+
+@media (max-width: 639px) {
+  .message {
+    gap: 6px;
+  }
+
+  .assistantIcon {
+    width: 29px;
+    height: 29px;
+  }
+
+  .messageContent {
+    padding: 11px;
+  }
+
+  .keyboardHint {
+    display: none;
+  }
+}

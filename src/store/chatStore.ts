@@ -1,6 +1,5 @@
 import { create } from 'zustand'
-import { SAMPLE_CHATS, DEMO_MESSAGES } from '@/utils/constants'
-import { generateChatId } from '@/utils/formatters'
+import { generateChatId, truncateText } from '@/utils/formatters'
 import { ContentModerationError, moderateChatContent } from '@/utils/contentModeration'
 import { ragChatService } from '@/services/ragChatService'
 
@@ -49,7 +48,6 @@ interface ChatState {
   // Actions
   setActiveChat: (chatId: string) => void
   createNewChat: (title?: string) => Chat
-  createWelcomeChat: (userName: string) => Chat
   sendMessage: (content: string, attachments?: ChatAttachment[]) => Promise<void>
   deleteChat: (chatId: string) => void
   archiveChat: (chatId: string) => void
@@ -58,13 +56,11 @@ interface ChatState {
   searchChats: (query: string) => Chat[]
 }
 
+const NEW_CHAT_TITLE = 'Cuộc trò chuyện mới'
+
 export const useChatStore = create<ChatState>((set, get) => ({
-  chats: SAMPLE_CHATS.map(chat => ({
-    ...chat,
-    messages: chat.id === 'chat_1' ? DEMO_MESSAGES : [],
-  })) as Chat[],
-  
-  activeChatId: 'chat_1',
+  chats: [],
+  activeChatId: null,
   isTyping: false,
   isLoading: false,
   processingStage: '',
@@ -76,7 +72,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
   createNewChat: (title?: string) => {
     const newChat: Chat = {
       id: generateChatId(),
-      title: title || 'Cuộc trò chuyện mới',
+      title: title || NEW_CHAT_TITLE,
       lastMessage: '',
       timestamp: new Date().toISOString(),
       unread: false,
@@ -92,40 +88,20 @@ export const useChatStore = create<ChatState>((set, get) => ({
     return newChat
   },
 
-  createWelcomeChat: (userName: string) => {
-    const now = new Date().toISOString()
-    const newChat: Chat = {
-      id: generateChatId(),
-      title: `Xin chào ${userName}`,
-      lastMessage: `Xin chào ${userName}`,
-      timestamp: now,
-      unread: false,
-      status: 'active',
-      messages: [{
-        id: `msg_${Date.now()}_welcome`,
-        role: 'assistant',
-        content: `Xin chào ${userName}! Tôi là Legal AI, trợ lý hỗ trợ tra cứu các vấn đề pháp lý nội bộ. Bạn muốn tra cứu nội dung nào hôm nay?`,
-        timestamp: now,
-        status: 'sent',
-      }],
-    }
-    set(state => ({ chats: [newChat, ...state.chats], activeChatId: newChat.id }))
-    return newChat
-  },
-
   sendMessage: async (content: string, attachments = []) => {
-    const { activeChatId, chats } = get()
-    if (!activeChatId || !content.trim()) return
+    const question = content.trim()
+    if (!question) return
 
-    const moderation = moderateChatContent(content)
+    const moderation = moderateChatContent(question)
     if (!moderation.allowed) {
       throw new ContentModerationError(moderation.message || 'Nội dung không phù hợp.')
     }
 
+    const activeChatId = get().activeChatId ?? get().createNewChat().id
     const userMessage: Message = {
       id: `msg_${Date.now()}_user`,
       role: 'user',
-      content: content.trim(),
+      content: question,
       timestamp: new Date().toISOString(),
       status: 'sending' as const,
       attachments,
@@ -137,7 +113,10 @@ export const useChatStore = create<ChatState>((set, get) => ({
         chat.id === activeChatId
           ? {
               ...chat,
-              lastMessage: content,
+              title: chat.messages.length === 0 && chat.title === NEW_CHAT_TITLE
+                ? truncateText(userMessage.content.replace(/\s+/g, ' '), 80)
+                : chat.title,
+              lastMessage: question,
               timestamp: userMessage.timestamp,
               messages: [...chat.messages, userMessage],
             }
@@ -149,7 +128,7 @@ export const useChatStore = create<ChatState>((set, get) => ({
 
     try {
       set({ processingStage: 'Đang truy xuất và tổng hợp từ kho tài liệu...' })
-      const ragResponse = await ragChatService.sendQueryToRAG(content)
+      const ragResponse = await ragChatService.sendQueryToRAG(question)
       const aiResponse: Message = {
         id: ragResponse.id,
         role: 'assistant',
