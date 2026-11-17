@@ -16,6 +16,8 @@ import {
   X
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
+import UserAvatar from '@/components/ui/UserAvatar'
+import ConfirmDialog from '@/components/ui/ConfirmDialog'
 
 interface NavItem {
   id: string
@@ -31,6 +33,7 @@ export default function AdminSidebar() {
   const { user, logout } = useAuthStore()
   const [collapsed, setCollapsed] = useState(false)
   const [showMobile, setShowMobile] = useState(false)
+  const [confirmLogout, setConfirmLogout] = useState(false)
 
   const navItems: NavItem[] = [
     { id: 'dashboard', label: 'Dashboard', icon: <LayoutDashboard className="w-5 h-5" />, path: '/admin' },
@@ -99,15 +102,7 @@ export default function AdminSidebar() {
         {!collapsed && user && (
           <div className="p-4 border-b border-dark-border">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-full overflow-hidden bg-gradient-to-r from-accent-500 to-neon-cyan">
-                {user.avatar ? (
-                  <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center">
-                    <Users className="w-6 h-6" />
-                  </div>
-                )}
-              </div>
+              <UserAvatar src={user.avatarUrl || user.avatar} name={user.name} size="lg" className="bg-gradient-to-r from-accent-500 to-neon-cyan text-white" />
               
               <div className="flex-1 min-w-0">
                 <h3 className="font-semibold truncate">{user.name}</h3>
@@ -153,7 +148,7 @@ export default function AdminSidebar() {
         {/* Footer */}
         <div className="p-4 border-t border-dark-border">
           <button
-            onClick={handleLogout}
+            onClick={() => setConfirmLogout(true)}
             className={`w-full flex items-center ${collapsed ? 'justify-center' : 'gap-3'} p-3 rounded-xl
               hover:bg-red-500/20 hover:text-red-400 transition-all duration-300 text-gray-300`}
           >
@@ -170,6 +165,7 @@ export default function AdminSidebar() {
           onClick={() => setShowMobile(false)}
         />
       )}
+      <ConfirmDialog isOpen={confirmLogout} onClose={() => setConfirmLogout(false)} onConfirm={handleLogout} title="Đăng xuất khỏi trang quản trị?" message="Bạn sẽ cần đăng nhập lại để tiếp tục quản lý người dùng và tài liệu." confirmLabel="Đăng xuất" />
     </>
   )
 }

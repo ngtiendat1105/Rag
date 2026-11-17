@@ -1,0 +1,387 @@
+.workspace {
+  display: grid;
+  grid-template-columns: 270px minmax(0, 1fr);
+  height: 100dvh;
+  min-width: 0;
+  overflow: hidden;
+  background: var(--ui-canvas);
+  color: var(--ui-text);
+}
+
+.desktopSidebar {
+  min-height: 0;
+  border-right: 1px solid var(--ui-line);
+}
+
+.main {
+  display: flex;
+  min-height: 0;
+  min-width: 0;
+  flex-direction: column;
+}
+
+.header {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  min-height: 70px;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 26px;
+  border-bottom: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+
+.headerTitle,
+.headerActions {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.headerTitle {
+  min-width: 0;
+}
+
+.headerActions {
+  flex: none;
+}
+
+.breadcrumb {
+  color: var(--ui-muted);
+  font-size: 0.75rem;
+}
+
+.conversationTitle {
+  overflow: hidden;
+  font-size: 0.9375rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.header .drawerTrigger {
+  display: none;
+}
+
+.account {
+  position: relative;
+}
+
+.account summary {
+  padding-inline: 6px;
+  cursor: pointer;
+  list-style: none;
+}
+
+.account summary::-webkit-details-marker {
+  display: none;
+}
+
+.avatar {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: none;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--ui-selected);
+  color: var(--ui-primary);
+  font-size: 0.875rem;
+}
+
+.accountName {
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.accountOptions {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  display: grid;
+  min-width: 195px;
+  gap: 2px;
+  padding: 5px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+}
+
+.accountOptions > * {
+  justify-content: flex-start;
+}
+
+.scrollArea {
+  min-height: 0;
+  flex: 1;
+  overflow: auto;
+  overscroll-behavior: contain;
+}
+
+.empty,
+.transcript,
+.composerRegion {
+  width: min(100%, 824px);
+  margin-inline: auto;
+  padding-inline: 28px;
+}
+
+.questionSuggestions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 5px;
+}
+
+.questionSuggestions > div {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  gap: 5px;
+  overflow-x: auto;
+}
+
+.questionSuggestions > div button {
+  max-width: min(100%, 320px);
+  flex: none;
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+}
+
+.questionSuggestions span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  padding-block: 42px;
+  text-align: center;
+}
+
+.emblem {
+  display: grid;
+  width: 62px;
+  height: 62px;
+  place-items: center;
+  margin-bottom: 23px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius-lg);
+  background: var(--ui-accent-surface);
+  color: var(--ui-accent);
+}
+
+.empty h1 {
+  font-size: clamp(1.75rem, 4vw, 2.75rem);
+  font-weight: 650;
+  letter-spacing: -0.045em;
+  line-height: 1.2;
+}
+
+.empty > p {
+  max-width: 450px;
+  margin-top: 11px;
+  color: var(--ui-muted);
+  font-size: 0.9375rem;
+  line-height: 1.65;
+  text-wrap: pretty;
+}
+
+.suggestions {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 30px;
+  padding: 0;
+  list-style: none;
+}
+
+.suggestions button {
+  position: relative;
+  display: flex;
+  width: 100%;
+  height: 100%;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 14px;
+  border: 1px solid var(--ui-line);
+  border-radius: var(--ui-radius);
+  background: var(--ui-surface);
+  color: var(--ui-primary);
+  text-align: left;
+}
+
+.suggestions button:hover:not(:disabled) {
+  border-color: var(--ui-focus);
+  background: var(--ui-subtle);
+}
+
+.suggestions button:disabled {
+  opacity: 0.64;
+}
+
+.suggestions strong,
+.suggestions button span span {
+  display: block;
+}
+
+.suggestions strong {
+  margin-bottom: 2px;
+  color: var(--ui-text);
+  font-size: 0.875rem;
+  font-weight: 650;
+}
+
+.suggestions button span span {
+  color: var(--ui-muted);
+  font-size: 0.8125rem;
+  line-height: 1.45;
+}
+
+.suggestionArrow {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  color: var(--ui-muted);
+}
+
+.transcript {
+  display: grid;
+  gap: 24px;
+  padding-block: 28px;
+}
+
+.composerRegion {
+  position: relative;
+  flex: none;
+  padding-top: 8px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+}
+
+.scrollButton {
+  position: absolute;
+  z-index: 1;
+  top: -48px;
+  left: 50%;
+  width: max-content;
+  transform: translateX(-50%);
+  border: 1px solid var(--ui-line);
+  background: var(--ui-surface);
+  box-shadow: var(--ui-shadow);
+}
+
+.drawer {
+  position: fixed;
+  inset: 0 auto 0 0;
+  width: min(88vw, 330px);
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  overflow: hidden;
+  margin: 0;
+  border: none;
+  background: var(--ui-sidebar);
+  color: var(--ui-text);
+}
+
+.drawer::backdrop {
+  background: rgb(15 23 42 / 48%);
+}
+
+.drawerBody {
+  height: 100%;
+}
+
+.closeDrawer {
+  position: absolute;
+  top: 13px;
+  right: 8px;
+}
+
+@media (max-width: 1023px) {
+  .workspace {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .desktopSidebar {
+    display: none;
+  }
+
+  .header .drawerTrigger {
+    display: inline-flex;
+  }
+}
+
+@media (max-width: 639px) {
+  .header {
+    min-height: 60px;
+    gap: 4px;
+    padding-inline: 8px;
+  }
+
+  .headerActions {
+    gap: 0;
+  }
+
+  .header .exportButton {
+    width: 44px;
+    padding: 0;
+  }
+
+  .exportButton span,
+  .accountName {
+    display: none;
+  }
+
+  .empty,
+  .transcript,
+  .composerRegion {
+    padding-inline: 14px;
+  }
+
+  .empty {
+    padding-block: 24px;
+  }
+
+  .emblem {
+    width: 50px;
+    height: 50px;
+    margin-bottom: 14px;
+  }
+
+  .suggestions {
+    max-width: 450px;
+    grid-template-columns: 1fr;
+    gap: 7px;
+    margin-top: 18px;
+  }
+
+  .suggestions button {
+    min-height: 54px;
+    flex-direction: row;
+    align-items: center;
+    padding: 8px 31px 8px 12px;
+  }
+
+  .suggestions button svg {
+    flex: none;
+  }
+
+  .suggestionArrow {
+    top: 12px;
+    right: 9px;
+  }
+}

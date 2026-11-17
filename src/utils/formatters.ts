@@ -1,4 +1,4 @@
-import { format, formatDistanceToNow, parseISO } from 'date-fns'
+import { differenceInDays, format, formatDistanceToNowStrict, isValid, parseISO } from 'date-fns'
 import { vi } from 'date-fns/locale'
 
 export const formatDate = (date: Date | string): string => {
@@ -8,7 +8,10 @@ export const formatDate = (date: Date | string): string => {
 
 export const formatRelativeTime = (date: Date | string): string => {
   const dateObj = typeof date === 'string' ? parseISO(date) : date
-  return formatDistanceToNow(dateObj, { locale: vi, addSuffix: true })
+  if (!isValid(dateObj)) return 'Không rõ thời gian'
+  const ageInDays = Math.max(0, differenceInDays(new Date(), dateObj))
+  if (ageInDays > 7) return format(dateObj, 'dd/MM/yyyy', { locale: vi })
+  return formatDistanceToNowStrict(dateObj, { locale: vi, addSuffix: true })
 }
 
 export const formatChatDate = (date: Date | string): string => {

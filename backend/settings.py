@@ -56,9 +56,15 @@ class Settings(BaseSettings):
     def select_provider_model_default(cls, values):
         if isinstance(values, dict) and "rag_llm_model" not in values:
             provider = values.get("rag_llm_provider")
-            if provider in ("bedrock", SettingsProvider.BEDROCK):
+            if provider in ("bedrock", SettingsProvider.BEDROCK) and values.get("rag_llm_model") in (None, "", "llama3.2:latest"):
                 values = {**values, "rag_llm_model": "us.amazon.nova-lite-v1:0"}
         return values
+
+    @model_validator(mode="after")
+    def normalize_provider_model(self):
+        if self.rag_llm_provider == SettingsProvider.BEDROCK and self.rag_llm_model == "llama3.2:latest":
+            self.rag_llm_model = "us.amazon.nova-lite-v1:0"
+        return self
 
     @field_validator("rag_llm_model", "ollama_base_url", "bedrock_region")
     @classmethod

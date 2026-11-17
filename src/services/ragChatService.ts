@@ -7,6 +7,8 @@ export interface RAGChatOptions {
   maxTokens?: number
   includeReferences?: boolean
   contextWindow?: number
+  signal?: AbortSignal
+  files?: File[]
 }
 
 export interface ChatContext {
@@ -24,6 +26,8 @@ interface RagSource {
   doc_id?: string
   effective_date?: string
   is_verified?: boolean
+  page?: number
+  preview_url?: string
 }
 
 interface BackendRagResponse {
@@ -43,10 +47,13 @@ export interface RAGResponse extends Omit<ChatResponse, 'references'> {
 
 class RAGChatService {
   async sendQueryToRAG(message: string, _context?: ChatContext, _options?: RAGChatOptions): Promise<RAGResponse> {
+    const formData = new FormData()
+    formData.append('question', message.trim())
+    _options?.files?.forEach(file => formData.append('files', file, file.name))
     const response = await fetch('/api/rag/chat', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: message.trim() }),
+      body: formData,
+      signal: _options?.signal,
     })
     const data = await response.json().catch(() => ({})) as BackendRagResponse
     if (!response.ok) throw new Error(data.message || 'Không thể truy vấn kho tài liệu.')
@@ -59,6 +66,9 @@ class RAGChatService {
       ].filter(Boolean).join(', ')
       return {
         title: source.document || source.doc_id || 'Tài liệu trong kho dữ liệu',
+        documentId: source.doc_id || source.chunk_id,
+        page: source.page,
+        previewUrl: source.preview_url || (source.document ? `/api/documents/preview?name=${encodeURIComponent(source.document)}` : undefined),
         excerpt: [location, source.effective_date && source.effective_date !== 'N/A' ? `Hiệu lực: ${source.effective_date}` : '', source.is_verified === false ? 'Nguồn cần đối chiếu.' : ''].filter(Boolean).join(' · '),
       }
     })
@@ -78,6 +88,9 @@ class RAGChatService {
         content: references[index]?.excerpt || '',
         relevance: 1,
       })),
+      suggestedQuestions: Array.isArray((data as BackendRagResponse & { suggested_questions?: string[] }).suggested_questions)
+        ? (data as BackendRagResponse & { suggested_questions?: string[] }).suggested_questions
+        : undefined,
     }
   }
 

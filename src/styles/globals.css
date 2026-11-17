@@ -63,24 +63,93 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
+/* Consistent range controls for dark admin forms */
+.rag-range {
+  appearance: none;
+  border-radius: 999px;
+  outline: none;
+}
+
+.rag-range::-webkit-slider-runnable-track {
+  height: 0.5rem;
+  border-radius: 999px;
+}
+
+.rag-range::-webkit-slider-thumb {
+  appearance: none;
+  width: 1.125rem;
+  height: 1.125rem;
+  margin-top: -0.3125rem;
+  border: 2px solid #dff4ff;
+  border-radius: 999px;
+  background: #0084e6;
+  box-shadow: 0 0 0 3px rgba(0, 132, 230, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.rag-range:hover::-webkit-slider-thumb,
+.rag-range:focus-visible::-webkit-slider-thumb {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 4px rgba(0, 132, 230, 0.3);
+}
+
+.rag-range::-moz-range-track {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: rgba(42, 42, 74, 0.9);
+}
+
+.rag-range::-moz-range-progress {
+  height: 0.5rem;
+  border-radius: 999px;
+  background: #0084e6;
+}
+
+.rag-range::-moz-range-thumb {
+  width: 1.125rem;
+  height: 1.125rem;
+  border: 2px solid #dff4ff;
+  border-radius: 999px;
+  background: #0084e6;
+  box-shadow: 0 0 0 3px rgba(0, 132, 230, 0.2);
+  transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.rag-range:hover::-moz-range-thumb,
+.rag-range:focus-visible::-moz-range-thumb {
+  transform: scale(1.12);
+  box-shadow: 0 0 0 4px rgba(0, 132, 230, 0.3);
+}
+
+.rag-range:focus-visible {
+  box-shadow: 0 0 0 3px rgba(77, 178, 255, 0.35);
+}
+
 /* Custom scrollbar */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 7px;
+  height: 7px;
 }
 
 ::-webkit-scrollbar-track {
-  background: rgba(255, 255, 255, 0.05);
-  border-radius: 4px;
+  background: transparent;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #0084e6, #407aff);
-  border-radius: 4px;
+  background: transparent;
+  border-radius: 999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #407aff, #9d00ff);
+  background: #cbd5e1;
+}
+
+*:hover::-webkit-scrollbar-thumb {
+  background: #e2e8f0;
+}
+
+*:hover::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
 }
 
 /* Markdown styling for AI messages */
@@ -133,6 +202,20 @@ body {
   color: #334155;
   font-size: 0.9375rem;
   line-height: 1.75;
+}
+
+.chat-professional .markdown-content ul {
+  list-style: disc;
+  padding-left: 1.35rem;
+}
+
+.chat-professional .markdown-content ol {
+  list-style: decimal;
+  padding-left: 1.35rem;
+}
+
+.chat-professional .markdown-content li {
+  padding-left: 0.25rem;
 }
 
 .chat-professional .markdown-content h1,

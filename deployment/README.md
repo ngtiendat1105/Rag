@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # Production deployment runbook
 
 ## 1. Target layout
@@ -129,8 +128,7 @@ behind an AWS ALB/Cloud Run service, use Qdrant Cloud or a replicated Qdrant
 cluster, and run Ollama behind a private GPU load balancer with model capacity
 and queue limits. Keep document ingestion as a separate job so API replicas
 never rebuild the index concurrently.
-=======
-# LegalAI AWS deployment
+## LegalAI AWS deployment
 
 Production uses AWS Lambda (container image) for FastAPI, API Gateway HTTP API,
 Qdrant Cloud, Google Gemini, and Amplify Hosting for Next.js. Supabase and
@@ -175,4 +173,3 @@ environment variables: `RAG_API_URL`, `LEGALAI_API_KEY`,
 
 Keep `GOOGLE_API_KEY` and `QDRANT_API_KEY` in Lambda only. Redeploy Amplify
 after changing variables.
->>>>>>> 81ecfc7 (Add AWS Lambda and Amplify deployment)

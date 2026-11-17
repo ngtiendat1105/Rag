@@ -589,6 +589,8 @@ Khi chạy nhiều worker hoặc upload/index đồng thời, nên chuyển từ
 Các chức năng đã có:
 
 - [x] RAG pipeline end-to-end.
+- [x] Shared legal prompt with bounded context.
+- [x] Deterministic citation footer and verification warning.
 - [x] Sentence Transformer embedding 768 chiều.
 - [x] Qdrant vector search.
 - [x] Metadata normalization.
@@ -627,7 +629,7 @@ Thiết lập local trong `.env.local`:
 RAG_API_URL=http://127.0.0.1:8000
 LEGALAI_API_KEY=mot-khoa-bi-mat-dai
 RAG_LLM_PROVIDER=ollama
-RAG_LLM_MODEL=llama3.2:3b
+RAG_LLM_MODEL=llama3.2:latest
 OLLAMA_BASE_URL=http://127.0.0.1:11434
 ```
 
@@ -636,7 +638,7 @@ Chuẩn bị dữ liệu và chạy các dịch vụ:
 ```powershell
 python -m pip install -r backend/requirements.txt
 python backend/sync_documents.py
-ollama pull llama3.2:3b
+ollama pull llama3.2:latest
 ollama serve
 python -m uvicorn --app-dir backend api:app --host 127.0.0.1 --port 8000
 npm run dev

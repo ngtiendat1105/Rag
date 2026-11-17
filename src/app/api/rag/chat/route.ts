@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { readSession, SESSION_COOKIE } from '@/lib/session'
+import { recordQuestion } from '@/lib/supabaseQuestions'
 
 export const runtime = 'nodejs'
 
@@ -10,9 +11,17 @@ export async function POST(request: NextRequest) {
   if (!session) return NextResponse.json({ message: 'Phiên đăng nhập đã hết hạn.' }, { status: 401 })
 
   let question = ''
+  let files: File[] = []
   try {
-    const body = await request.json()
-    question = typeof body.question === 'string' ? body.question.trim() : ''
+    const contentType = request.headers.get('content-type') || ''
+    if (contentType.includes('multipart/form-data')) {
+      const body = await request.formData()
+      question = typeof body.get('question') === 'string' ? String(body.get('question')).trim() : ''
+      files = body.getAll('files').filter((value): value is File => value instanceof File)
+    } else {
+      const body = await request.json()
+      question = typeof body.question === 'string' ? body.question.trim() : ''
+    }
   } catch {
     return NextResponse.json({ message: 'Dữ liệu gửi lên không hợp lệ.' }, { status: 400 })
   }
@@ -29,10 +38,27 @@ export async function POST(request: NextRequest) {
     : 180_000
   const timeout = setTimeout(() => controller.abort(), timeoutMs)
   try {
-    const response = await fetch(`${baseUrl}/api/chat`, {
+    try {
+      await recordQuestion({ userId: session.id, question })
+    } catch (error) {
+      console.error('Không thể ghi nhận câu hỏi để thống kê:', error)
+    }
+
+    const endpoint = files.length > 0 ? `${baseUrl}/api/chat/local` : `${baseUrl}/api/chat`
+    const requestBody = files.length > 0
+      ? (() => {
+          const form = new FormData()
+          form.append('question', question)
+          files.forEach(file => form.append('files', file, file.name))
+          return form
+        })()
+      : JSON.stringify({ question })
+    const headers: HeadersInit = { 'X-API-Key': apiKey }
+    if (!files.length) headers['Content-Type'] = 'application/json'
+    const response = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-      body: JSON.stringify({ question }),
+      headers,
+      body: requestBody,
       signal: controller.signal,
       cache: 'no-store',
     })
