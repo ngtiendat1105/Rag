@@ -1,0 +1,9 @@
+fastapi
+mangum
+numpy
+qdrant-client
+langchain-core
+langchain-qdrant
+boto3>=1.34.131,<2
+python-dotenv
+pydantic-settings

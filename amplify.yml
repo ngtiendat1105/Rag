@@ -1,0 +1,26 @@
+version: 1
+
+frontend:
+  phases:
+    preBuild:
+      commands:
+        - npm ci
+    build:
+      commands:
+        - env | grep -e RAG_API_URL >> .env.production
+        - env | grep -e LEGALAI_API_KEY >> .env.production
+        - env | grep -e RAG_REQUEST_TIMEOUT_MS >> .env.production
+        - env | grep -e SUPABASE_URL >> .env.production
+        - env | grep -e SUPABASE_SERVICE_ROLE_KEY >> .env.production
+        - env | grep -e AUTH_SESSION_SECRET >> .env.production
+        - env | grep -e RESEND_API_KEY >> .env.production
+        - env | grep -e RESEND_FROM_EMAIL >> .env.production
+        - npm run build
+  artifacts:
+    baseDirectory: .next
+    files:
+      - '**/*'
+  cache:
+    paths:
+      - node_modules/**/*
+      - .next/cache/**/*

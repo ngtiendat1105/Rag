@@ -1,16 +1,14 @@
+import logging
 import os
 import secrets
 import threading
 import time
-import tempfile
-import shutil
 from pathlib import Path
 from collections import defaultdict, deque
 from functools import lru_cache
 from typing import TYPE_CHECKING
 
-from fastapi import Depends, FastAPI, File, Form, Header, HTTPException, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi import Depends, FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dotenv import load_dotenv
@@ -22,9 +20,18 @@ if TYPE_CHECKING:
 
 
 app = FastAPI(title="LegalAI RAG API", version="1.0.0")
+logger = logging.getLogger(__name__)
+configured_origins = [
+    origin.strip()
+    for origin in os.getenv(
+        "CORS_ALLOWED_ORIGINS",
+        "https://legalai.id.vn,https://www.legalai.id.vn",
+    ).split(",")
+    if origin.strip()
+]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["https://legalai.id.vn", "https://www.legalai.id.vn"],
+    allow_origins=configured_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST"],
     allow_headers=["Content-Type", "X-API-Key"],
@@ -46,7 +53,6 @@ class ChatResponse(BaseModel):
     sources: list
     has_warning: bool
     num_sources: int
-    suggested_questions: list[str] = []
 
 
 @lru_cache(maxsize=1)
@@ -59,13 +65,17 @@ def get_pipeline() -> "RAGPipeline":
         "openai": LLMProvider.OPENAI,
         "google_gemini": LLMProvider.GOOGLE_GEMINI,
         "gemini": LLMProvider.GOOGLE_GEMINI,
+        "bedrock": LLMProvider.BEDROCK,
     }
     provider = providers.get(provider_name)
     if provider is None:
         raise ValueError(f"RAG_LLM_PROVIDER không hợp lệ: {provider_name}")
     return create_rag_pipeline(
         provider=provider,
-        model_name=os.getenv("RAG_LLM_MODEL") or os.getenv("OLLAMA_MODEL", "llama3.2:latest"),
+        model_name=(
+            os.getenv("RAG_LLM_MODEL")
+            or (os.getenv("OLLAMA_MODEL", "llama3.2:3b") if provider == LLMProvider.OLLAMA else None)
+        ),
     )
 
 
@@ -116,65 +126,13 @@ def chat(
     try:
         result = get_pipeline().query(question)
     except RetrievalError as exc:
-        raise HTTPException(status_code=503, detail=str(exc)) from exc
+        logger.exception("RAG retrieval failed")
+        raise HTTPException(status_code=503, detail="Không thể truy vấn kho tài liệu. Vui lòng thử lại sau.") from exc
     except Exception as exc:
+        logger.exception("RAG pipeline initialization or generation failed")
         raise HTTPException(status_code=502, detail="LLM không thể xử lý yêu cầu") from exc
 
     if "error" in result:
-        raise HTTPException(status_code=502, detail=result["error"])
+        logger.error("RAG generation failed: %s", result["error"])
+        raise HTTPException(status_code=502, detail="Dịch vụ AI không thể xử lý yêu cầu. Vui lòng thử lại sau.")
     return result
-
-
-@app.post("/api/chat/local", response_model=ChatResponse)
-def local_chat(
-    request: Request,
-    question: str = Form(..., min_length=2, max_length=2000),
-    files: list[UploadFile] = File(...),
-    _: None = Depends(require_api_key),
-):
-    enforce_rate_limit(request)
-    if not files or len(files) > 5:
-        raise HTTPException(status_code=400, detail="Vui lòng đính kèm từ 1 đến 5 tài liệu.")
-
-    from document_loader import load_document
-
-    combined_parts = []
-    first_name = files[0].filename or "tài liệu tải lên"
-    temp_paths: list[Path] = []
-    try:
-        for upload in files:
-            filename = Path(upload.filename or "document").name
-            suffix = Path(filename).suffix.lower()
-            if suffix not in {".pdf", ".doc", ".docx", ".txt"}:
-                raise HTTPException(status_code=400, detail=f"{filename}: chỉ hỗ trợ PDF, Word hoặc TXT.")
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp:
-                shutil.copyfileobj(upload.file, temp)
-                temp_paths.append(Path(temp.name))
-            if temp_paths[-1].stat().st_size > 10 * 1024 * 1024:
-                raise HTTPException(status_code=413, detail=f"{filename}: kích thước vượt quá 10 MB.")
-            if suffix == ".txt":
-                text = temp_paths[-1].read_text(encoding="utf-8", errors="replace")
-            else:
-                _, text = load_document(temp_paths[-1])
-            combined_parts.append(f"### Tài liệu: {filename}\n{text}")
-        result = get_pipeline().query_local_document(question, first_name, "\n\n".join(combined_parts))
-        return result
-    except HTTPException:
-        raise
-    except Exception as exc:
-        raise HTTPException(status_code=422, detail=f"Không thể phân tích tài liệu đính kèm: {exc}") from exc
-    finally:
-        for path in temp_paths:
-            path.unlink(missing_ok=True)
-
-
-@app.get("/api/documents/preview")
-def document_preview(name: str, _: None = Depends(require_api_key)):
-    from config import INPUT_DIR, UPLOAD_DIR
-
-    safe_name = Path(name).name
-    candidates = [UPLOAD_DIR / safe_name, INPUT_DIR / safe_name]
-    path = next((candidate for candidate in candidates if candidate.is_file()), None)
-    if path is None or path.suffix.lower() != ".pdf":
-        raise HTTPException(status_code=404, detail="Không tìm thấy file PDF nguồn.")
-    return FileResponse(path, media_type="application/pdf", filename=path.name)

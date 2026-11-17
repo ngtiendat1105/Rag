@@ -5,11 +5,17 @@ Simplified test without emojis for Windows console
 
 import sys
 import os
+import pytest
 sys.path.insert(0, os.path.dirname(__file__))
 
 from config_llm import LLMConfig, LLMProvider
 from rag_pipeline import create_rag_pipeline
 
+@pytest.mark.integration
+@pytest.mark.skipif(
+    os.getenv("RUN_LIVE_RAG_TESTS") != "1",
+    reason="requires Ollama, embeddings, and a local Qdrant index",
+)
 def test_single_query():
     """Test a single query through the RAG pipeline"""
     

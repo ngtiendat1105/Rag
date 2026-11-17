@@ -3,22 +3,13 @@ embedder.py - Class VietnameseEmbedder sử dụng sentence-transformers cho ti�
 Xử lý embedding văn bản tiếng Việt với model tối ưu hóa
 """
 
-import sys
+import os
 import time
 from typing import List, Optional, Union
 import numpy as np
 
-if hasattr(sys.stdout, "reconfigure"):
-    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-if hasattr(sys.stderr, "reconfigure"):
-    sys.stderr.reconfigure(encoding="utf-8", errors="replace")
-
-try:
-    from sentence_transformers import SentenceTransformer
-    SENTENCE_TRANSFORMERS_AVAILABLE = True
-except ImportError:
-    SENTENCE_TRANSFORMERS_AVAILABLE = False
-    print("⚠️ Warning: sentence-transformers not installed. Please install with: pip install sentence-transformers")
+SentenceTransformer = None
+SENTENCE_TRANSFORMERS_AVAILABLE = False
 
 from config_phase2 import (
     VIETNAMESE_EMBEDDING_MODEL, 
@@ -26,6 +17,7 @@ from config_phase2 import (
     EMBEDDING_DEVICE,
     VERBOSE_LOGGING
 )
+from settings import settings
 
 
 class VietnameseEmbedder:
@@ -46,10 +38,16 @@ class VietnameseEmbedder:
             ImportError: Nếu sentence-transformers chưa được cài đặt
             RuntimeError: Nếu không thể tải model
         """
-        if not SENTENCE_TRANSFORMERS_AVAILABLE:
-            raise ImportError(
-                "sentence-transformers is required. Install with: pip install sentence-transformers"
-            )
+        global SentenceTransformer, SENTENCE_TRANSFORMERS_AVAILABLE
+        if SentenceTransformer is None:
+            try:
+                from sentence_transformers import SentenceTransformer as _SentenceTransformer
+                SentenceTransformer = _SentenceTransformer
+                SENTENCE_TRANSFORMERS_AVAILABLE = True
+            except ImportError as exc:
+                raise ImportError(
+                    "sentence-transformers is required for local embeddings"
+                ) from exc
         
         # Sử dụng model từ config nếu không chỉ định
         self.model_name = model_name or VIETNAMESE_EMBEDDING_MODEL
@@ -78,14 +76,18 @@ class VietnameseEmbedder:
             
             # Tải model với các tham số tối ưu
             self.model = SentenceTransformer(
-                self.model_name,
+                os.getenv("EMBEDDING_MODEL_PATH") or self.model_name,
                 device=self.device,
-                trust_remote_code=True  # Quan trọng cho một số model custom
+                local_files_only=bool(os.getenv("EMBEDDING_MODEL_PATH")),
+                trust_remote_code=False,
             )
             
             # Kiểm tra embedding dimension thực tế
-            test_embedding = self.model.encode(["test"], convert_to_numpy=True)
-            actual_dimension = test_embedding.shape[1]
+            if hasattr(self.model, "get_sentence_embedding_dimension"):
+                actual_dimension = self.model.get_sentence_embedding_dimension()
+            else:
+                probe = self.model.encode("dimension probe", convert_to_numpy=True)
+                actual_dimension = int(np.asarray(probe).shape[-1])
             
             if actual_dimension != self.embedding_dimension:
                 print(f"⚠️ Dimension mismatch: config={self.embedding_dimension}, actual={actual_dimension}")
@@ -260,8 +262,12 @@ class VietnameseEmbedder:
 
 # ============ FACTORY FUNCTION & TEST ============
 
-def create_vietnamese_embedder(model_name: Optional[str] = None, device: Optional[str] = None) -> VietnameseEmbedder:
-    """Factory function để tạo VietnameseEmbedder"""
+def create_vietnamese_embedder(model_name: Optional[str] = None, device: Optional[str] = None):
+    """Create the configured embedder without importing torch on Bedrock Lambda."""
+    provider = settings.rag_embedding_provider.strip().lower()
+    if provider == "bedrock":
+        from bedrock_embedder import BedrockEmbedder
+        return BedrockEmbedder(model_name=model_name, dimension=settings.rag_embedding_dimension, region_name=settings.bedrock_region)
     return VietnameseEmbedder(model_name=model_name, device=device)
 
 

@@ -15,6 +15,10 @@ related_docs: ["Nghị định 158/2025/NĐ-CP", "Nghị định 161/2026/NĐ-CP
 
 # LUẬT BẢO HIỂM XÃ HỘI 2024
 
+## KHÁI NIỆM BẢO HIỂM XÃ HỘI
+
+**Bảo hiểm xã hội (BHXH)** là sự bảo đảm thay thế hoặc bù đắp một phần thu nhập của người tham gia khi họ bị giảm hoặc mất thu nhập do ốm đau, thai sản, tai nạn lao động, bệnh nghề nghiệp, hết tuổi lao động hoặc chết, trên cơ sở đóng vào quỹ BHXH hoặc được ngân sách nhà nước bảo đảm theo quy định pháp luật.
+
 ## NHÓM A: ĐỐI TƯỢNG VÀ MỨC THAM CHIẾU
 
 ### Điều 2. Đối tượng áp dụng (BHXH bắt buộc)

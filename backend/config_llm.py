@@ -4,10 +4,10 @@ Chứa tham số LLM, model selection, và cấu hình retrieval
 """
 
 import os
-from typing import Any
-from pathlib import Path
-from typing import Optional, Dict, Any
+from typing import Any, Dict, Optional
 from enum import Enum
+
+from settings import SettingsProvider, settings
 
 class LLMProvider(Enum):
     """Các nhà cung cấp LLM được hỗ trợ"""
@@ -15,6 +15,7 @@ class LLMProvider(Enum):
     GOOGLE_GEMINI = "google_gemini"
     OLLAMA = "ollama"
     HUGGINGFACE = "huggingface"
+    BEDROCK = "bedrock"
 
 
 class LLMConfig:
@@ -46,6 +47,8 @@ class LLMConfig:
             return self.OLLAMA_MODEL
         elif provider == LLMProvider.HUGGINGFACE:
             return self.HUGGINGFACE_MODEL
+        elif provider == LLMProvider.BEDROCK:
+            return self.BEDROCK_MODEL
         else:
             return "unknown"
     
@@ -54,7 +57,16 @@ class LLMConfig:
         # HuggingFace models not supported in current setup
         # from langchain_huggingface import ChatHuggingFace
         
-        if self.provider == LLMProvider.OPENAI:
+        if self.provider == LLMProvider.BEDROCK:
+            from bedrock_llm import create_bedrock_llm
+            return create_bedrock_llm(
+                model_id=self.model_name,
+                region_name=self.BEDROCK_REGION,
+                max_tokens=self.max_tokens,
+                temperature=self.temperature,
+                request_timeout=self.REQUEST_TIMEOUT_SECONDS,
+            )
+        elif self.provider == LLMProvider.OPENAI:
             from langchain_openai import ChatOpenAI
             return ChatOpenAI(
                 model=self.model_name,
@@ -76,19 +88,13 @@ class LLMConfig:
             )
         elif self.provider == LLMProvider.OLLAMA:
             from langchain_ollama import ChatOllama
-            ollama_options = {
-                "model": self.model_name,
-                "temperature": self.temperature,
-                "base_url": self.OLLAMA_BASE_URL,
-                "num_ctx": int(os.getenv("OLLAMA_NUM_CTX", "4096")),
-                "num_predict": self.max_tokens,
-                "keep_alive": os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
-            }
-            num_thread = os.getenv("OLLAMA_NUM_THREAD", "").strip()
-            if num_thread.isdigit() and int(num_thread) > 0:
-                ollama_options["num_thread"] = int(num_thread)
             return ChatOllama(
-                **ollama_options,
+                model=self.model_name,
+                temperature=self.temperature,
+                base_url=self.OLLAMA_BASE_URL,
+                num_ctx=int(os.getenv("OLLAMA_NUM_CTX", "4096")),
+                num_predict=self.max_tokens,
+                keep_alive=os.getenv("OLLAMA_KEEP_ALIVE", "30m"),
             )
         elif self.provider == LLMProvider.HUGGINGFACE:
             raise NotImplementedError("HuggingFace models are currently not supported. Please use OpenAI, Google Gemini, or Ollama instead.")
@@ -102,21 +108,31 @@ class LLMConfig:
     
     # ============ CẤU HÌNH CHUNG ============
     
-    # Số lượng chunk tối đa cần lấy cho mỗi query
-    TOP_K = int(os.getenv("RAG_TOP_K", "3"))
+    # Số chunk trả cho pipeline sau rerank. Candidates được lấy rộng hơn.
+    TOP_K = settings.rag_top_k
+    RETRIEVAL_TOP_K = settings.effective_retrieval_top_k
+    RERANK_TOP_N = settings.rag_rerank_top_n
     
     # Temperature cho LLM (0 = chính xác nhất, phù hợp cho pháp lý)
     TEMPERATURE = 0.0
     
     # Max tokens cho response (đủ dài để trả lời chi tiết)
-    MAX_TOKENS = int(os.getenv("RAG_MAX_OUTPUT_TOKENS", "700"))
-    REQUEST_TIMEOUT_SECONDS = float(os.getenv("LLM_REQUEST_TIMEOUT_SECONDS", "120"))
-    MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))
+    MAX_TOKENS = settings.rag_max_output_tokens
+    REQUEST_TIMEOUT_SECONDS = settings.llm_request_timeout_seconds
+    MAX_RETRIES = settings.llm_max_retries
     
     # ============ CẤU HÌNH PROVIDER MẶC ĐỊNH ============
     
     # Provider mặc định (có thể thay đổi bằng biến môi trường)
-    DEFAULT_PROVIDER = LLMProvider.OPENAI
+    DEFAULT_PROVIDER = LLMProvider(settings.rag_llm_provider.value)
+
+    # Bedrock uses the AWS default credential chain, not a provider API key.
+    BEDROCK_REGION = settings.bedrock_region
+    BEDROCK_MODEL = (
+        settings.rag_llm_model
+        if settings.rag_llm_provider == SettingsProvider.BEDROCK
+        else "us.amazon.nova-lite-v1:0"
+    )
     
     # ============ CẤU HÌNH OPENAI ============
     
@@ -124,7 +140,7 @@ class LLMConfig:
     OPENAI_MODEL = "gpt-3.5-turbo"  # Hoặc "gpt-4-turbo-preview"
     
     # API key OpenAI (lấy từ biến môi trường)
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+    OPENAI_API_KEY = settings.openai_api_key
     
     # ============ CẤU HÌNH GOOGLE GEMINI ============
     
@@ -132,15 +148,15 @@ class LLMConfig:
     GEMINI_MODEL = "gemini-1.5-pro"  # Hoặc "gemini-1.5-flash"
     
     # API key Google AI (lấy từ biến môi trường)
-    GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY", "")
+    GOOGLE_API_KEY = settings.google_api_key
     
     # ============ CẤU HÌNH OLLAMA ============
     
     # Model Ollama local (các model hỗ trợ tiếng Việt)
-    OLLAMA_MODEL = "llama3.2:latest"  # Hoặc "mistral:latest", "llama3.1:latest"
+    OLLAMA_MODEL = settings.rag_llm_model
     
     # Base URL Ollama (mặc định localhost:11434)
-    OLLAMA_BASE_URL = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+    OLLAMA_BASE_URL = settings.ollama_base_url
     
     # ============ CẤU HÌNH HUGGINGFACE ============
     
@@ -153,10 +169,10 @@ class LLMConfig:
     # ============ CẤU HÌNH RETRIEVAL ============
     
     # Ngưỡng similarity tối thiểu cho retrieval
-    SIMILARITY_THRESHOLD = 0.3
+    SIMILARITY_THRESHOLD = settings.rag_similarity_threshold
     
     # Có sử dụng metadata filtering không
-    USE_METADATA_FILTERING = False
+    USE_METADATA_FILTERING = settings.rag_use_metadata_filtering
     
     # Bộ lọc metadata mặc định (từ Giai đoạn 2)
     DEFAULT_METADATA_FILTER = {
@@ -197,30 +213,37 @@ class LLMConfig:
         
         if provider == LLMProvider.OPENAI:
             config.update({
-                "model": self.OPENAI_MODEL,
+                "model": self.model_name,
                 "api_key": self.OPENAI_API_KEY,
                 "requires_api_key": bool(self.OPENAI_API_KEY)
             })
         
         elif provider == LLMProvider.GOOGLE_GEMINI:
             config.update({
-                "model": self.GEMINI_MODEL,
+                "model": self.model_name,
                 "api_key": self.GOOGLE_API_KEY,
                 "requires_api_key": bool(self.GOOGLE_API_KEY)
             })
         
         elif provider == LLMProvider.OLLAMA:
             config.update({
-                "model": self.OLLAMA_MODEL,
+                "model": self.model_name,
                 "base_url": self.OLLAMA_BASE_URL,
                 "requires_api_key": False
             })
         
         elif provider == LLMProvider.HUGGINGFACE:
             config.update({
-                "model": self.HUGGINGFACE_MODEL,
+                "model": self.model_name,
                 "device": self.HUGGINGFACE_DEVICE,
                 "requires_api_key": False
+            })
+        elif provider == LLMProvider.BEDROCK:
+            config.update({
+                "model": self.model_name,
+                "region": self.BEDROCK_REGION,
+                "requires_api_key": False,
+                "credential_source": "aws_default_chain",
             })
         
         return config
@@ -246,6 +269,9 @@ class LLMConfig:
         
         # Check HuggingFace
         status["huggingface"] = True  # Không cần API key
+
+        # This means no API key is required, not that model access is granted.
+        status["bedrock"] = True
         
         return status
     
@@ -271,6 +297,8 @@ class LLMConfig:
             elif provider == LLMProvider.OLLAMA and api_status["ollama"]:
                 available.append(provider)
             elif provider == LLMProvider.HUGGINGFACE and api_status["huggingface"]:
+                available.append(provider)
+            elif provider == LLMProvider.BEDROCK:
                 available.append(provider)
         
         return available

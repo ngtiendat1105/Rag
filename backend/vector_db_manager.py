@@ -4,10 +4,14 @@ Sử dụng Qdrant (local mode) cho khả năng lọc metadata mạnh mẽ
 """
 
 import json
+import os
 import time
 from typing import List, Dict, Any, Optional, Union
 from pathlib import Path
 import numpy as np
+from dotenv import load_dotenv
+
+from payload_indexes import ensure_payload_indexes
 
 try:
     from qdrant_client import QdrantClient
@@ -34,7 +38,7 @@ class VectorDBManager:
     Xử lý kết nối, tạo collection, và các thao tác CRUD
     """
     
-    def __init__(self, collection_name: Optional[str] = None, local_mode: bool = True):
+    def __init__(self, collection_name: Optional[str] = None, local_mode: Optional[bool] = None):
         """
         Khởi tạo VectorDBManager
         
@@ -50,9 +54,16 @@ class VectorDBManager:
             raise ImportError(
                 "qdrant-client is required. Install with: pip install qdrant-client"
             )
+
+        # Standalone indexing commands must read the same env file as the API.
+        # Existing deployment environment variables always take precedence.
+        load_dotenv(Path(__file__).resolve().parents[1] / ".env.local")
         
         self.collection_name = collection_name or COLLECTION_NAME
-        self.local_mode = local_mode
+        self.local_mode = (
+            not bool(os.getenv("QDRANT_URL", "").strip())
+            if local_mode is None else local_mode
+        )
         self.client = None
         self.collection_exists = False
         
@@ -86,11 +97,15 @@ class VectorDBManager:
                 if VERBOSE_LOGGING:
                     print("🔄 Đang khởi tạo Qdrant client (remote mode)...")
                 
-                # URL mặc định cho Qdrant local server
-                self.client = QdrantClient(host="localhost", port=6333)
+                qdrant_url = os.getenv("QDRANT_URL", "").strip() or "http://localhost:6333"
+                self.client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=os.getenv("QDRANT_API_KEY", "").strip() or None,
+                    timeout=float(os.getenv("QDRANT_TIMEOUT_SECONDS", "30")),
+                )
                 
                 if VERBOSE_LOGGING:
-                    print("✅ Qdrant client initialized (remote: localhost:6333)")
+                    print("✅ Qdrant client initialized (remote)")
             
             # Kiểm tra kết nối
             self._check_connection()
@@ -221,6 +236,11 @@ class VectorDBManager:
                 self.collection_exists = True
             else:
                 raise RuntimeError(error_msg)
+
+        # Provision before ingestion so remote strict-mode filters are supported.
+        # Local embedded Qdrant does not maintain payload indexes.
+        if not self.local_mode:
+            ensure_payload_indexes(self.client, self.collection_name)
     
     def upsert_vectors(
         self, 
@@ -501,7 +521,7 @@ class VectorDBManager:
 
 # ============ FACTORY FUNCTION & TEST ============
 
-def create_vector_db_manager(collection_name: Optional[str] = None, local_mode: bool = True) -> VectorDBManager:
+def create_vector_db_manager(collection_name: Optional[str] = None, local_mode: Optional[bool] = None) -> VectorDBManager:
     """Factory function để tạo VectorDBManager"""
     return VectorDBManager(collection_name=collection_name, local_mode=local_mode)
 

@@ -13,7 +13,9 @@ curl --fail --silent --show-error \
   -H 'Content-Type: application/json' \
   -d "{\"name\":\"${MODEL_NAME}\",\"stream\":false}" >/dev/null
 
-if [ ! -f /app/vector_db/qdrant_storage/meta.json ]; then
+if [ -n "${QDRANT_URL:-}" ]; then
+  echo "Using remote Qdrant at ${QDRANT_URL}; skipping local index bootstrap."
+elif [ ! -f /app/vector_db/qdrant_storage/meta.json ]; then
   echo "Building the document index for the first deployment..."
   python /app/sync_documents.py
 else

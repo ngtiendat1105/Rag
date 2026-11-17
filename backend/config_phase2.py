@@ -4,7 +4,10 @@ Chứa model, đường dẫn DB, batch_size, và từ khóa nhận diện câu 
 """
 
 import os
+import tempfile
 from pathlib import Path
+
+from settings import settings
 
 # ============ CẤU HÌNH ĐƯỜNG DẪN ============
 
@@ -14,12 +17,16 @@ WORKSPACE_ROOT = Path(__file__).parent
 # Đường dẫn đến file JSONL đầu vào từ Giai đoạn 1
 INPUT_JSONL_PATH = WORKSPACE_ROOT / "processed_output" / "processed_knowledge_base.jsonl"
 
-# Thư mục chứa Vector Database (Qdrant local)
-VECTOR_DB_DIR = WORKSPACE_ROOT / "vector_db"
-VECTOR_DB_DIR.mkdir(exist_ok=True)
+# Thư mục chứa Vector Database (Qdrant local). Lambda's /var/task is read-only;
+# remote Qdrant is used in production, so any compatibility path belongs in /tmp.
+if os.getenv("AWS_LAMBDA_FUNCTION_NAME"):
+    VECTOR_DB_DIR = Path(tempfile.gettempdir()) / "legalai" / "vector_db"
+else:
+    VECTOR_DB_DIR = WORKSPACE_ROOT / "vector_db"
+VECTOR_DB_DIR.mkdir(parents=True, exist_ok=True)
 
 # Qdrant collection name
-COLLECTION_NAME = "legal_knowledge_base"
+COLLECTION_NAME = settings.qdrant_collection
 
 # ============ CẤU HÌNH MODEL EMBEDDING ============
 
@@ -28,11 +35,11 @@ COLLECTION_NAME = "legal_knowledge_base"
 # 1. "bkai-foundation-models/vietnamese-bi-encoder" - Model của BKAI
 # 2. "KeepitIreal/Vietnamese-sbert" - Model Sentence-BERT cho tiếng Việt
 # 3. "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2" - Multilingual
-VIETNAMESE_EMBEDDING_MODEL = "sentence-transformers/paraphrase-multilingual-mpnet-base-v2"
+VIETNAMESE_EMBEDDING_MODEL = settings.rag_embedding_model
 
 # Kích thước vector embedding (phụ thuộc vào model)
 # KeepitIreal/Vietnamese-sbert: 768 dimensions
-EMBEDDING_DIMENSION = 768
+EMBEDDING_DIMENSION = settings.rag_embedding_dimension
 
 # Device cho inference (cuda nếu có GPU, cpu nếu không)
 EMBEDDING_DEVICE = "cpu"  # Có thể đổi thành "cuda" nếu có GPU
@@ -83,7 +90,7 @@ METADATA_KEYS_FOR_FILTERING = [
 DEFAULT_FILTER_CONDITIONS = {}
 
 # Ngưỡng similarity tối thiểu (cosine similarity)
-MIN_SIMILARITY_THRESHOLD = 0.3
+MIN_SIMILARITY_THRESHOLD = settings.rag_similarity_threshold
 
 # ============ CẤU HÌNH LOGGING & DEBUG ============
 

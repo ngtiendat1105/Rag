@@ -5,7 +5,6 @@ Module này tạo pipeline RAG hoàn chỉnh tích hợp retrieval, context chec
 import logging
 import os
 import time
-from types import SimpleNamespace
 from typing import List, Dict, Any, Optional, Tuple
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.prompts import ChatPromptTemplate, SystemMessagePromptTemplate, HumanMessagePromptTemplate
@@ -24,6 +23,13 @@ logger = logging.getLogger(__name__)
 MAX_CONTEXT_CHARS = int(os.getenv("RAG_MAX_CONTEXT_CHARS", "8000"))
 MAX_CONTEXT_DOCUMENTS = int(os.getenv("RAG_MAX_CONTEXT_DOCUMENTS", "3"))
 LLM_RETRY_BACKOFF_SECONDS = float(os.getenv("LLM_RETRY_BACKOFF_SECONDS", "1"))
+INSUFFICIENT_EVIDENCE_RESPONSE = (
+    "Hiện tại chưa đủ căn cứ pháp lý trong dữ liệu hệ thống để trả lời câu hỏi này"
+)
+LEGAL_DISCLAIMER = (
+    "Lưu ý: Thông tin do AI tổng hợp chỉ mang tính chất tham khảo. "
+    "Kết quả cần được kiểm tra lại bởi chuyên viên pháp lý trước khi áp dụng."
+)
 
 
 class RAGPipeline:
@@ -72,31 +78,52 @@ class RAGPipeline:
         return chain
 
     def _build_prompt(self, question: str, raw_docs: List[Any]) -> str:
-        """Build the shared legal prompt from the documents returned by retrieval."""
-        documents = []
+        """Build a bounded, evidence-only prompt for the generation model."""
+        context_parts = []
         remaining = MAX_CONTEXT_CHARS
-        for doc in raw_docs[:MAX_CONTEXT_DOCUMENTS]:
-            content = str(getattr(doc, "page_content", ""))
+        for i, doc in enumerate(raw_docs[:MAX_CONTEXT_DOCUMENTS], 1):
             if remaining <= 0:
                 break
-            bounded_content = content[:remaining]
-            documents.append(
-                {
-                    "content": bounded_content,
-                    "page_content": bounded_content,
-                    "metadata": getattr(doc, "metadata", {}) or {},
-                }
-            )
-            remaining -= len(bounded_content)
+            metadata = doc.metadata or {}
+            title = metadata.get("title", metadata.get("document_name", "Văn bản pháp luật"))
+            article = metadata.get("article_number", metadata.get("article", ""))
+            header = f"--- TÀI LIỆU {i} ---"
+            if title:
+                header += f"\nNguồn: {title}"
+            if article:
+                header += f", Điều {article}"
+            block = f"{header}\n{doc.page_content}\n"
+            context_parts.append(block[:remaining])
+            remaining -= len(block)
 
-        formatted_context = self.prompt_class.format_context_for_prompt(
-            documents,
-            include_warning=self._check_warning_required(documents),
-        )
-        return self.prompt_class.HUMAN_PROMPT_TEMPLATE.format(
-            question=question,
-            formatted_context=formatted_context,
-        )
+        context = "\n".join(context_parts)
+        return f"""BẠN LÀ TRỢ LÝ TRA CỨU PHÁP LÝ NỘI BỘ.
+
+QUY TẮC AN TOÀN BẮT BUỘC:
+1. Chỉ sử dụng thông tin xuất hiện trực tiếp trong TÀI LIỆU THAM KHẢO.
+2. Nếu tài liệu không đủ căn cứ, chỉ trả lời đúng câu:
+   "{INSUFFICIENT_EVIDENCE_RESPONSE}"
+3. Không dùng kiến thức nền, không suy đoán, không tự bổ sung danh sách,
+   số tiền, thời hạn, tỷ lệ, điều kiện hoặc tên điều luật.
+4. Mỗi khẳng định pháp lý phải kèm nguồn theo dạng
+   [Tên văn bản - Điều - Khoản]. Không tự tạo số Điều/Khoản.
+5. Phân biệt rõ các mục: "Quy định pháp luật", "Quy định công ty",
+   "Gợi ý/Lưu ý tham khảo". Chỉ tạo mục nào có dữ liệu trong context.
+6. Không lặp lại một ý hoặc một mục trong danh sách. Không kéo dài câu trả lời
+   bằng cách lặp từ khóa.
+7. Cuối câu trả lời luôn thêm đúng cảnh báo:
+   "{LEGAL_DISCLAIMER}"
+
+CÂU HỎI: {question}
+
+TÀI LIỆU THAM KHẢO:
+{context}
+
+YÊU CẦU:
+- Trả lời ngắn gọn, đúng trọng tâm bằng tiếng Việt.
+- Nếu context chỉ có một phần thông tin, nêu rõ giới hạn thay vì đoán.
+
+TRẢ LỜI:"""
 
     def _invoke_with_retry(self, prompt: str) -> str:
         attempts = int(getattr(self.config, "MAX_RETRIES", 2)) + 1
@@ -171,7 +198,11 @@ class RAGPipeline:
             has_warning = self._check_warning_required(docs)
 
             if not raw_docs:
-                answer = self.prompt_class.create_no_context_response(question)
+                answer = (
+                    f"{INSUFFICIENT_EVIDENCE_RESPONSE}\n"
+                    "Dữ liệu hiện tại không chứa thông tin đủ để trả lời câu hỏi này.\n\n"
+                    f"{LEGAL_DISCLAIMER}"
+                )
             else:
                 answer = self._invoke_with_retry(self._build_prompt(question, raw_docs))
             
@@ -184,38 +215,21 @@ class RAGPipeline:
                         "document_name",
                         metadata.get("title", metadata.get("doc_id", "Unknown"))
                     ),
-                    "article": (
-                        metadata.get("article")
-                        or metadata.get("article_number")
-                        or "N/A"
+                    "article": metadata.get(
+                        "article",
+                        metadata.get("article_number", "N/A")
                     ),
-                    "clause": (
-                        metadata.get("clause")
-                        or metadata.get("clause_number")
-                        or "N/A"
+                    "clause": metadata.get(
+                        "clause",
+                        metadata.get("clause_number", "N/A")
                     ),
                     "chunk_id": metadata.get("chunk_id", "N/A"),
                     "doc_id": metadata.get("doc_id", "N/A"),
                     "effective_date": metadata.get("effective_date", "N/A"),
                     "status": metadata.get("status", "N/A"),
-                    "is_verified": metadata.get("is_verified", True),
-                    "page": metadata.get("page") or metadata.get("page_number"),
-                    "preview_url": (
-                        f"/api/documents/preview?name={metadata.get('document_name', metadata.get('title', ''))}"
-                        if str(metadata.get("document_name", metadata.get("title", ""))).lower().endswith(".pdf")
-                        else None
-                    ),
+                    "is_verified": metadata.get("is_verified", True)
                 }
                 sources.append(source_info)
-
-            if sources:
-                citation_documents = [
-                    {"content": doc["page_content"], "metadata": doc["metadata"]}
-                    for doc in docs
-                ]
-                answer += self.prompt_class.create_citation_footer(citation_documents)
-                if has_warning:
-                    answer += self.prompt_class.UNVERIFIED_WARNING
             
             result = {
                 "question": question,
@@ -240,39 +254,8 @@ class RAGPipeline:
                 "answer": f"Lỗi hệ thống: {str(e)}",
                 "sources": [],
                 "has_warning": False,
-                "error": str(e),
+                "error": str(e)
             }
-
-    def query_local_document(self, question: str, document_name: str, document_text: str) -> Dict[str, Any]:
-        """Answer using only the uploaded document, without querying the vector store."""
-        document = SimpleNamespace(
-                page_content=document_text,
-                metadata={
-                    "document_name": document_name,
-                    "doc_id": f"local:{document_name}",
-                    "is_verified": False,
-                },
-        )
-        answer = self._invoke_with_retry(self._build_prompt(question, [document]))
-        return {
-                "question": question,
-                "answer": answer,
-                "sources": [{
-                    "document": document_name,
-                    "doc_id": f"local:{document_name}",
-                    "chunk_id": f"local:{document_name}",
-                    "page": None,
-                    "preview_url": None,
-                    "is_verified": False,
-                }],
-                "has_warning": True,
-                "num_sources": 1,
-                "suggested_questions": [
-                    f"Tóm tắt các điểm chính trong {document_name}",
-                    f"Điều khoản nào trong {document_name} có rủi ro pháp lý?",
-                    f"Cần bổ sung gì để hoàn thiện {document_name}?",
-                ],
-        }
     
     def batch_query(self, questions: List[str]) -> List[Dict[str, Any]]:
         """

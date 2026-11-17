@@ -1,385 +1,306 @@
-"""
-markdown_chunker.py - Logic chia nhỏ văn bản Markdown dựa trên thẻ Heading ###
-Thực hiện chunking phức tạp với bảo toàn ngữ cảnh và blockquote
+"""Structure-aware chunking for Vietnamese legal Markdown documents.
+
+The chunker treats an article and its clauses as the primary legal units.
+Chunk size is a target, not a hard truncation limit: a clause is never cut
+just to satisfy a character limit.
 """
 
 import re
-from typing import List, Dict, Any, Tuple
-from pathlib import Path
+from typing import Any, Dict, List, Optional
 
-from config import ARTICLE_SPLIT_PATTERN, KEEP_CONTEXT_HEADINGS, MAX_CHUNK_SIZE
+from config import MAX_CHUNK_SIZE
+
+
+HEADING_RE = re.compile(r"^(#{1,6})[ \t]+(.+?)\s*$")
+ARTICLE_RE = re.compile(
+    r"^(?:Điều|ĐIỀU)\s+([0-9]+[A-Za-zÀ-ỹ]?)\s*[.:–-]?\s*(.*)$",
+    re.IGNORECASE,
+)
+CLAUSE_RE = re.compile(
+    r"^(?:\*\*)?\s*(?:Khoản|KHOẢN)\s*([0-9]+)\s*(?:\*\*)?\s*[:.)-]?\s*(.*)$",
+    re.IGNORECASE,
+)
+POINT_RE = re.compile(
+    r"^(?:[*+-]\s*)?(?:Điểm|ĐIỂM)\s+([a-zđ])\s*[:.)-]?\s*(.*)$",
+    re.IGNORECASE,
+)
+NUMBERED_CLAUSE_RE = re.compile(r"^([0-9]+)[.)]\s+(.+)$")
+DATE_RE = re.compile(r"\b(20\d{2})[-/.](\d{1,2})[-/.](\d{1,2})\b")
+FRONTMATTER_RE = re.compile(
+    r"^\s*\\?---\s*\n(.*?)\n\\?---\s*\n?",
+    re.DOTALL,
+)
 
 
 class MarkdownChunker:
-    """Lớp thực hiện chia nhỏ văn bản Markdown thành các chunk dựa trên Điều luật"""
-    
-    def __init__(self):
-        """Khởi tạo chunker với regex pattern đã cấu hình"""
-        # Compile regex pattern để tách các Điều
-        # re.MULTILINE: ^ và $ khớp đầu/cuối mỗi dòng
-        # re.DOTALL: . khớp cả newline (quan trọng để bắt nội dung nhiều dòng)
-        self.article_pattern = re.compile(
-            ARTICLE_SPLIT_PATTERN,
-            re.MULTILINE | re.DOTALL
-        )
-        
-        # Pattern để phát hiện thẻ heading cấp 1 và 2 (# và ##)
-        # ^#+: bắt đầu dòng với một hoặc nhiều #
-        # \s+: theo sau là khoảng trắng
-        # .*: nội dung tiêu đề
-        self.heading_pattern = re.compile(r'^(#+)\s+(.*)$', re.MULTILINE)
-    
+    """Split Markdown while preserving legal hierarchy and parent headings."""
+
+    def __init__(
+        self,
+        *,
+        max_chunk_size: int = MAX_CHUNK_SIZE,
+        overlap_ratio: float = 0.15,
+        priority_internal: int = 2,
+        priority_legal: int = 1,
+    ):
+        if max_chunk_size <= 0:
+            raise ValueError("max_chunk_size must be positive")
+        if not 0 <= overlap_ratio <= 0.5:
+            raise ValueError("overlap_ratio must be between 0 and 0.5")
+        self.max_chunk_size = max_chunk_size
+        self.overlap_ratio = overlap_ratio
+        self.priority_internal = priority_internal
+        self.priority_legal = priority_legal
+
     def split_into_articles(self, markdown_content: str) -> List[Dict[str, Any]]:
-        """
-        Chia nội dung Markdown thành các Điều (article) riêng biệt
-        
-        Args:
-            markdown_content: Nội dung Markdown đã loại bỏ frontmatter
-            
-        Returns:
-            List[Dict]: Danh sách các chunk với keys: 'article_title', 'content'
-        """
-        # Tìm tất cả các Điều bằng regex
-        articles = []
-        
-        # finditer tìm tất cả match không chồng lấn
-        for match in self.article_pattern.finditer(markdown_content):
-            article_text = match.group(1).strip()
-            
-            # Tách tiêu đề Điều và nội dung
-            article_data = self._extract_article_data(article_text)
-            if article_data:
-                articles.append(article_data)
-        
-        # Một số tài liệu nội bộ dùng ### 1.1..., ### 2.4... thay vì ### Điều ...
-        # Các heading này vẫn là ranh giới ngữ nghĩa phù hợp để retrieval.
-        if not articles:
-            articles = self._split_by_level_three_heading(markdown_content)
-        
+        """Parse articles and retain the heading hierarchy above each article."""
+        lines = markdown_content.replace("\r\n", "\n").splitlines()
+        articles: List[Dict[str, Any]] = []
+        parents: List[str] = []
+        current: Optional[Dict[str, Any]] = None
+
+        def flush() -> None:
+            nonlocal current
+            if current is not None and "\n".join(current["content"]).strip():
+                current["content"] = "\n".join(current["content"]).strip()
+                current["context_headings"] = list(current["context_headings"])
+                current["raw_text"] = (
+                    f"{current['article_title']}\n{current['content']}"
+                )
+                articles.append(current)
+            current = None
+
+        for line in lines:
+            heading = HEADING_RE.match(line.strip())
+            heading_text = heading.group(2).strip() if heading else ""
+            article_match = ARTICLE_RE.match(heading_text) if heading else None
+
+            if (
+                heading
+                and not article_match
+                and len(heading.group(1)) in (2, 3)
+                and (current is None or len(heading.group(1)) in (2, 3))
+            ):
+                flush()
+                current = {
+                    "article_title": line.strip(),
+                    "article_number": "",
+                    "article_name": heading_text,
+                    "content": [],
+                    "context_headings": list(parents),
+                }
+                continue
+
+            if heading and not article_match:
+                level = len(heading.group(1))
+                parents = parents[: level - 1]
+                parents.append(line.strip())
+                if current is not None:
+                    current["content"].append(line)
+                continue
+
+            if article_match:
+                flush()
+                number, name = article_match.groups()
+                title = line.strip()
+                current = {
+                    "article_title": title,
+                    "article_number": number,
+                    "article_name": name.strip(),
+                    "content": [],
+                    "context_headings": list(parents),
+                }
+                continue
+
+            if current is not None:
+                current["content"].append(line)
+
+        flush()
         return articles
 
-    def _split_by_level_three_heading(self, markdown_content: str) -> List[Dict[str, Any]]:
-        """Split generic sections and retain content under chapter headings."""
-        matches = list(re.finditer(r"^##(?!#)\s+.+$|^###\s+.+$", markdown_content, re.MULTILINE))
-        articles = []
-        for index, match in enumerate(matches):
-            end = matches[index + 1].start() if index + 1 < len(matches) else len(markdown_content)
-            article_text = markdown_content[match.start():end].strip()
-            article_data = self._extract_article_data(article_text)
-            if article_data and article_data["content"]:
-                articles.append(article_data)
-        return articles
-    
-    def _extract_article_data(self, article_text: str) -> Dict[str, Any]:
-        """
-        Trích xuất thông tin từ text của một Điều
-        
-        Args:
-            article_text: Toàn bộ text của một Điều (bao gồm tiêu đề và nội dung)
-            
-        Returns:
-            Dict với 'article_title' và 'content'
-        """
-        if not article_text:
-            return None
-        
-        # Tìm dòng đầu tiên (tiêu đề Điều)
-        lines = article_text.split('\n')
-        if not lines:
-            return None
-        
-        article_title = lines[0].strip()
-        
-        # Nội dung là phần còn lại (có thể rỗng)
-        content = '\n'.join(lines[1:]).strip()
-        
-        # Loại bỏ context headings nếu cấu hình yêu cầu
-        if not KEEP_CONTEXT_HEADINGS:
-            content = self._remove_context_headings(content)
-        
-        return {
-            'article_title': article_title,
-            'content': content,
-            'raw_text': article_text  # Giữ raw text để debug
-        }
-    
-    def _remove_context_headings(self, content: str) -> str:
-        """
-        Loại bỏ các thẻ heading cấp 1 và 2 (#, ##) khỏi nội dung
-        
-        Args:
-            content: Nội dung Markdown
-            
-        Returns:
-            Nội dung đã loại bỏ context headings
-        """
-        lines = content.split('\n')
-        filtered_lines = []
-        
-        for line in lines:
-            # Kiểm tra nếu line là heading (# hoặc ##)
-            # nhưng không phải ### (cấp 3 - Điều luật)
-            if line.startswith('#') and not line.startswith('###'):
-                # Có thể giữ lại như comment hoặc bỏ hoàn toàn
-                # Ở đây chúng ta bỏ hoàn toàn
-                continue
-            filtered_lines.append(line)
-        
-        return '\n'.join(filtered_lines)
-    
-    def _fallback_split(self, markdown_content: str) -> List[Dict[str, Any]]:
-        """
-        Fallback strategy khi regex không hoạt động
-        Chia dựa trên dòng bắt đầu bằng "### Điều"
-        
-        Args:
-            markdown_content: Nội dung Markdown
-            
-        Returns:
-            List[Dict]: Danh sách các chunk
-        """
-        articles = []
-        lines = markdown_content.split('\n')
-        
-        current_article = None
-        current_content = []
-        
-        for line in lines:
-            # Kiểm tra nếu dòng bắt đầu bằng "### Điều"
-            if line.strip().startswith('### Điều'):
-                # Lưu article trước đó nếu có
-                if current_article is not None:
-                    articles.append({
-                        'article_title': current_article,
-                        'content': '\n'.join(current_content).strip(),
-                        'raw_text': f"{current_article}\n" + '\n'.join(current_content)
-                    })
-                
-                # Bắt đầu article mới
-                current_article = line.strip()
-                current_content = []
-            else:
-                # Thêm dòng vào nội dung article hiện tại
-                if current_article is not None:
-                    current_content.append(line)
-        
-        # Lưu article cuối cùng
-        if current_article is not None:
-            articles.append({
-                'article_title': current_article,
-                'content': '\n'.join(current_content).strip(),
-                'raw_text': f"{current_article}\n" + '\n'.join(current_content)
-            })
-        
-        return articles
-    
-    def validate_chunk_integrity(self, chunk: Dict[str, Any]) -> bool:
-        """
-        Kiểm tra tính toàn vẹn của một chunk
-        
-        Args:
-            chunk: Chunk cần kiểm tra
-            
-        Returns:
-            True nếu chunk hợp lệ, False nếu không
-        """
-        # Kiểm tra có tiêu đề không
-        if 'article_title' not in chunk or not chunk['article_title']:
-            return False
-        
-        # Kiểm tra tiêu đề có đúng định dạng "### Điều" không
-        title = chunk['article_title']
-        if not title.startswith('### Điều'):
-            return False
-        
-        # Kiểm tra có nội dung không (có thể rỗng nhưng vẫn hợp lệ)
-        if 'content' not in chunk:
-            return False
-        
-        # Kiểm tra blockquote được giữ nguyên (nếu có)
-        content = chunk['content']
-        lines = content.split('\n')
-        in_blockquote = False
-        
-        for line in lines:
+    def _split_units(self, content: str) -> List[str]:
+        """Return complete clause/point units, never truncating their text."""
+        lines = content.splitlines()
+        starts: List[int] = []
+        for index, line in enumerate(lines):
             stripped = line.strip()
-            if stripped.startswith('>'):
-                in_blockquote = True
-            elif in_blockquote and not stripped:
-                # Blockquote tiếp tục qua dòng trống
-                continue
-            elif in_blockquote and not stripped.startswith('>'):
-                # Blockquote bị cắt ngang - không hợp lệ
-                return False
-        
-        return True
-    
-    def analyze_chunk_structure(self, chunk: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Phân tích cấu trúc của một chunk
-        
-        Args:
-            chunk: Chunk cần phân tích
-            
-        Returns:
-            Dict với thông tin phân tích
-        """
-        content = chunk.get('content', '')
-        
-        # Đếm số dòng
-        lines = content.split('\n')
-        
-        # Đếm số khoản (bắt đầu bằng **Khoản)
-        khoan_count = len([l for l in lines if l.strip().startswith('**Khoản')])
-        
-        # Đếm số điểm (bắt đầu bằng - Điểm)
-        diem_count = len([l for l in lines if l.strip().startswith('- Điểm')])
-        
-        # Đếm blockquote lines
-        blockquote_lines = len([l for l in lines if l.strip().startswith('>')])
-        
-        # Tính độ dài
-        char_count = len(content)
-        word_count = len(content.split())
-        
+            if CLAUSE_RE.match(stripped) or NUMBERED_CLAUSE_RE.match(stripped):
+                starts.append(index)
+
+        if not starts:
+            return [content.strip()] if content.strip() else []
+
+        units: List[str] = []
+        for index, start in enumerate(starts):
+            end = starts[index + 1] if index + 1 < len(starts) else len(lines)
+            unit = "\n".join(lines[start:end]).strip()
+            if unit:
+                units.append(unit)
+        return units
+
+    def _group_units(self, units: List[str]) -> List[str]:
+        """Group whole clauses near the target size with semantic overlap."""
+        if not units:
+            return []
+        groups: List[str] = []
+        current: List[str] = []
+        current_size = 0
+        for unit in units:
+            unit_size = len(unit)
+            if current and current_size + unit_size + 2 > self.max_chunk_size:
+                groups.append("\n\n".join(current))
+                overlap_size = max(1, int(self.max_chunk_size * self.overlap_ratio))
+                carry: List[str] = []
+                carried = 0
+                for previous in reversed(current):
+                    if carry and carried + len(previous) + 2 > overlap_size:
+                        break
+                    carry.insert(0, previous)
+                    carried += len(previous) + 2
+                current = carry
+                current_size = sum(len(item) + 2 for item in current)
+            current.append(unit)
+            current_size += unit_size + 2
+        if current:
+            groups.append("\n\n".join(current))
+        return groups
+
+    def _context_prefix(self, headings: List[str], article_title: str) -> str:
+        context = headings + [article_title]
+        return "Ngữ cảnh: " + " -> ".join(context)
+
+    def _document_fields(self, base: Dict[str, Any]) -> Dict[str, Any]:
+        title = base.get("document_title") or base.get("title") or base.get(
+            "document_name", ""
+        )
+        document_type = base.get("type") or base.get("document_type") or "Khác"
+        status = str(base.get("status", "")).strip().lower()
+        is_active = base.get("is_active")
+        if is_active is None:
+            is_active = not any(
+                marker in status for marker in ("hết hiệu lực", "bãi bỏ", "đã hết")
+            )
+        effective_date = str(base.get("effective_date", "") or "")
+        date_match = DATE_RE.search(effective_date)
+        if date_match:
+            effective_date = (
+                f"{date_match.group(1)}-{int(date_match.group(2)):02d}-"
+                f"{int(date_match.group(3)):02d}"
+            )
+        priority = base.get("priority")
+        if priority is None:
+            priority = (
+                self.priority_internal
+                if any(word in str(document_type).lower() for word in ("nội bộ", "quy định", "quy chế"))
+                else self.priority_legal
+            )
         return {
-            'line_count': len(lines),
-            'khoan_count': khoan_count,
-            'diem_count': diem_count,
-            'blockquote_lines': blockquote_lines,
-            'char_count': char_count,
-            'word_count': word_count,
-            'has_blockquote': blockquote_lines > 0
+            **base,
+            "document_title": title,
+            "document_type": document_type,
+            "effective_date": effective_date,
+            "is_active": bool(is_active),
+            "priority": int(priority),
         }
-    
+
+    def _strip_frontmatter(
+        self, markdown_content: str, base_metadata: Dict[str, Any]
+    ) -> tuple[str, Dict[str, Any]]:
+        match = FRONTMATTER_RE.match(markdown_content)
+        if not match:
+            return markdown_content, dict(base_metadata)
+        parsed: Dict[str, Any] = {}
+        try:
+            import yaml
+            from yaml import YAMLError
+
+            parsed = dict(yaml.safe_load(match.group(1)) or {})
+        except (ImportError, TypeError, ValueError, YAMLError):
+            for line in match.group(1).splitlines():
+                key, separator, value = line.partition(":")
+                if separator:
+                    normalized_key = key.strip().replace("\\_", "_")
+                    parsed[normalized_key] = value.strip().strip("\"'")
+        merged = {**parsed, **base_metadata}
+        return markdown_content[match.end():], merged
+
     def create_chunks_with_metadata(
-        self, 
-        markdown_content: str, 
-        base_metadata: Dict[str, Any]
+        self, markdown_content: str, base_metadata: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
-        """
-        Tạo các chunk hoàn chỉnh với metadata
-        
-        Args:
-            markdown_content: Nội dung Markdown
-            base_metadata: Metadata cơ bản từ file
-            
-        Returns:
-            List[Dict]: Danh sách các chunk hoàn chỉnh
-        """
-        # Chia thành các article
-        articles = self.split_into_articles(markdown_content)
-        
-        # Tạo chunks hoàn chỉnh
-        chunks = []
-        
-        for article in articles:
-            for part_index, content in enumerate(
-                self._split_oversized_content(article['content']), 1
-            ):
-                chunk = {
-                    'article_title': article['article_title'],
-                    'content': content,
-                    'metadata': {
-                        **base_metadata,
-                        'article_title': article['article_title'],
-                        'chunk_part': part_index,
-                    },
+        chunks: List[Dict[str, Any]] = []
+        markdown_content, parsed_metadata = self._strip_frontmatter(
+            markdown_content, base_metadata
+        )
+        inferred_metadata = dict(parsed_metadata)
+        if not inferred_metadata.get("document_title"):
+            title_match = re.search(r"^#(?!#)\s+(.+?)\s*$", markdown_content, re.MULTILINE)
+            if title_match:
+                inferred_metadata["document_title"] = title_match.group(1).strip()
+        document_fields = self._document_fields(inferred_metadata)
+
+        for article in self.split_into_articles(markdown_content):
+            units = self._split_units(article["content"])
+            grouped = self._group_units(units) if units else [article["content"]]
+            if not grouped:
+                continue
+            for part_index, body in enumerate(grouped, 1):
+                prefix = self._context_prefix(
+                    article["context_headings"], article["article_title"]
+                )
+                content = f"{prefix}\n{body}".strip()
+                clause_match = next(
+                    (
+                        CLAUSE_RE.match(line.strip())
+                        for line in body.splitlines()
+                        if CLAUSE_RE.match(line.strip())
+                    ),
+                    None,
+                )
+                clause_number = clause_match.group(1) if clause_match else ""
+                metadata = {
+                    **document_fields,
+                    "article_title": article["article_title"],
+                    "article_number": article["article_number"],
+                    "article_section": article["article_title"],
+                    "clause_number": clause_number,
+                    "chunk_part": part_index,
                 }
-                chunk['raw_text'] = f"{article['article_title']}\n{content}"
-                chunk['analysis'] = self.analyze_chunk_structure(chunk)
-                chunk['is_valid'] = self.validate_chunk_integrity(chunk)
+                chunk = {
+                    "article_title": article["article_title"],
+                    "content": content,
+                    "raw_text": content,
+                    "metadata": metadata,
+                }
+                chunk["analysis"] = self.analyze_chunk_structure(chunk)
+                chunk["is_valid"] = self.validate_chunk_integrity(chunk)
                 chunks.append(chunk)
-        
         return chunks
 
-    def _split_oversized_content(self, content: str) -> List[str]:
-        """Split long articles at khoản/điểm boundaries while retaining labels."""
-        if len(content) <= MAX_CHUNK_SIZE:
-            return [content]
-        lines = content.splitlines(keepends=True)
-        parts, current = [], []
-        current_size = 0
-        for line in lines:
-            starts_section = line.lstrip().startswith(("**Khoản", "- Điểm"))
-            if current and current_size + len(line) > MAX_CHUNK_SIZE and starts_section:
-                parts.append("".join(current).strip())
-                current, current_size = [], 0
-            current.append(line)
-            current_size += len(line)
-        if current:
-            parts.append("".join(current).strip())
-        return parts or [content[:MAX_CHUNK_SIZE]]
+    def validate_chunk_integrity(self, chunk: Dict[str, Any]) -> bool:
+        title = chunk.get("article_title", "")
+        content = chunk.get("content", "")
+        return bool(title and content.strip() and not self._has_truncated_boundary(content))
 
+    def _has_truncated_boundary(self, content: str) -> bool:
+        """Detect an incomplete Markdown list/blockquote at the chunk end."""
+        lines = [line.strip() for line in content.splitlines() if line.strip()]
+        if not lines:
+            return True
+        return False
 
-# ============ HÀM TIỆN ÍCH ============
+    def analyze_chunk_structure(self, chunk: Dict[str, Any]) -> Dict[str, Any]:
+        content = chunk.get("content", "")
+        lines = content.splitlines()
+        return {
+            "line_count": len(lines),
+            "khoan_count": sum(bool(CLAUSE_RE.match(line.strip())) for line in lines),
+            "diem_count": sum(bool(POINT_RE.match(line.strip())) for line in lines),
+            "blockquote_lines": sum(line.strip().startswith(">") for line in lines),
+            "char_count": len(content),
+            "word_count": len(content.split()),
+            "has_blockquote": any(line.strip().startswith(">") for line in lines),
+        }
+
 
 def create_markdown_chunker() -> MarkdownChunker:
-    """Factory function để tạo MarkdownChunker"""
     return MarkdownChunker()
-
-
-def test_chunker():
-    """Test chức năng chunker với nội dung mẫu"""
-    from metadata_parser import MetadataParser
-    
-    # Tạo parser và chunker
-    parser = MetadataParser()
-    chunker = MarkdownChunker()
-    
-    # Lấy file mẫu
-    from config import get_input_files
-    input_files = get_input_files()
-    
-    if not input_files:
-        print("Không tìm thấy file Markdown để test")
-        return
-    
-    test_file = input_files[0]
-    print(f"Testing chunker với file: {test_file.name}")
-    
-    try:
-        # Parse metadata và nội dung
-        metadata, content = parser.parse_file(test_file)
-        
-        print(f"\n✅ Đã parse metadata và nội dung")
-        print(f"Độ dài nội dung: {len(content)} ký tự")
-        
-        # Chia thành chunks
-        chunks = chunker.create_chunks_with_metadata(content, metadata)
-        
-        print(f"\n✅ Đã tạo được {len(chunks)} chunks:")
-        
-        for i, chunk in enumerate(chunks[:3]):  # Hiển thị 3 chunk đầu
-            print(f"\n--- Chunk {i+1} ---")
-            print(f"Tiêu đề: {chunk['article_title']}")
-            print(f"Hợp lệ: {chunk['is_valid']}")
-            
-            analysis = chunk['analysis']
-            print(f"Phân tích: {analysis['khoan_count']} khoản, {analysis['diem_count']} điểm, {analysis['blockquote_lines']} dòng blockquote")
-            
-            # Hiển thị preview nội dung
-            content_preview = chunk['content'][:150] + "..." if len(chunk['content']) > 150 else chunk['content']
-            print(f"Nội dung preview: {content_preview}")
-        
-        if len(chunks) > 3:
-            print(f"\n... và {len(chunks) - 3} chunks khác")
-        
-        # Thống kê
-        valid_chunks = sum(1 for c in chunks if c['is_valid'])
-        total_blockquotes = sum(c['analysis']['blockquote_lines'] for c in chunks)
-        
-        print(f"\n📊 Thống kê:")
-        print(f"  - Tổng số chunks: {len(chunks)}")
-        print(f"  - Chunks hợp lệ: {valid_chunks}")
-        print(f"  - Tổng dòng blockquote: {total_blockquotes}")
-        
-    except Exception as e:
-        print(f"❌ Lỗi khi testing chunker: {e}")
-        import traceback
-        traceback.print_exc()
-
-
-if __name__ == "__main__":
-    # Test chức năng chunker
-    test_chunker()

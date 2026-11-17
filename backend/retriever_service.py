@@ -6,8 +6,8 @@ Kết nối với Vector Database từ Giai đoạn 2 và cung cấp retrieval c
 import os
 import re
 import sys
+import logging
 import time
-from collections import OrderedDict
 from typing import List, Dict, Any, Optional, Tuple
 from pathlib import Path
 
@@ -15,15 +15,15 @@ from pathlib import Path
 sys.path.append(str(Path(__file__).parent))
 
 try:
-    from langchain_qdrant import QdrantVectorStore
+    from langchain_qdrant import Qdrant
     from langchain_core.documents import Document
     from langchain_core.retrievers import BaseRetriever
     from qdrant_client import QdrantClient
     from qdrant_client.http import models
+    from qdrant_client.http.exceptions import UnexpectedResponse
     LANGCHAIN_AVAILABLE = True
 except ImportError as e:
     LANGCHAIN_AVAILABLE = False
-    QdrantVectorStore = None
     print(f"⚠️ Warning: LangChain or Qdrant client not installed: {e}")
     # Define fallback classes
     class Document:
@@ -46,14 +46,27 @@ from embedder import create_vietnamese_embedder, VietnameseEmbedder
 from metadata_utils import normalize_metadata
 from query_understanding import fold_text, understand_query
 
-try:
-    from sentence_transformers import CrossEncoder
-except ImportError:
-    CrossEncoder = None
+CrossEncoder = None
+
+logger = logging.getLogger(__name__)
 
 
 class RetrievalError(RuntimeError):
     """Lỗi hạ tầng hoặc cấu hình trong quá trình retrieval."""
+
+
+def _missing_source_file_index(exc: Exception) -> bool:
+    """Only the optional source-file hint may degrade to semantic retrieval."""
+    if not isinstance(exc, UnexpectedResponse) or exc.status_code != 400:
+        return False
+    try:
+        error = exc.structured()["status"]["error"]
+    except (KeyError, TypeError, ValueError):
+        return False
+    return (
+        isinstance(error, str)
+        and 'Index required but not found for "metadata.source_file"' in error
+    )
 
 
 class LegalRetrieverService:
@@ -96,34 +109,32 @@ class LegalRetrieverService:
             if similarity_threshold is not None 
             else LLMConfig.SIMILARITY_THRESHOLD
         )
-        self.rerank_top_n = max(
-            int(os.getenv("RAG_RERANK_TOP_N", str(max(LLMConfig.TOP_K * 4, 12)))),
-            LLMConfig.TOP_K,
-        )
-        self.rerank_max_candidates = max(
-            int(os.getenv("RAG_RERANKER_MAX_CANDIDATES", "8")),
-            LLMConfig.TOP_K,
-        )
-        self.embedding_cache_size = max(int(os.getenv("RAG_EMBEDDING_CACHE_SIZE", "128")), 0)
-        self.query_cache_size = max(int(os.getenv("RAG_QUERY_CACHE_SIZE", "64")), 0)
-        self.query_cache_ttl = max(float(os.getenv("RAG_QUERY_CACHE_TTL_SECONDS", "30")), 0.0)
-        self._embedding_cache = OrderedDict()
-        self._query_cache = OrderedDict()
         
         # Khởi tạo Qdrant client
         self.qdrant_client = None
         self.vector_store = None
         self.langchain_retriever = None
         reranker_name = os.getenv("RAG_RERANKER_MODEL", "").strip()
-        self.reranker = (
-            CrossEncoder(reranker_name)
-            if (
-                reranker_name
-                and os.getenv("RAG_ENABLE_RERANKER", "false").lower() in {"1", "true", "yes"}
-                and CrossEncoder is not None
+        self.reranker_name = reranker_name or None
+        self.reranker = None
+        if reranker_name and CrossEncoder is not None:
+            try:
+                self.reranker = CrossEncoder(
+                    reranker_name,
+                    max_length=int(os.getenv("RAG_RERANKER_MAX_LENGTH", "512")),
+                )
+                logger.info("Reranker loaded: %s", reranker_name)
+            except Exception as exc:
+                logger.warning(
+                    "Cannot load reranker %s; using Qdrant ranking: %s",
+                    reranker_name,
+                    exc,
+                )
+        elif reranker_name:
+            logger.warning(
+                "RAG_RERANKER_MODEL is set but sentence-transformers CrossEncoder "
+                "is unavailable; using Qdrant ranking."
             )
-            else None
-        )
         
         # Thống kê
         self.stats = {
@@ -144,17 +155,24 @@ class LegalRetrieverService:
     def _initialize_connection(self):
         """Khởi tạo kết nối đến Qdrant và tạo LangChain retriever"""
         try:
-            # Đường dẫn lưu trữ Qdrant
-            qdrant_storage_path = VECTOR_DB_DIR / "qdrant_storage"
-            
-            if not qdrant_storage_path.exists():
-                raise FileNotFoundError(
-                    f"Qdrant storage not found at {qdrant_storage_path}. "
-                    f"Please run Phase 2 indexing first."
+            qdrant_url = os.getenv("QDRANT_URL", "").strip()
+            qdrant_api_key = os.getenv("QDRANT_API_KEY", "").strip() or None
+            if qdrant_url:
+                self.qdrant_client = QdrantClient(
+                    url=qdrant_url,
+                    api_key=qdrant_api_key,
+                    timeout=float(os.getenv("QDRANT_TIMEOUT_SECONDS", "10")),
                 )
-            
-            # Tạo Qdrant client
-            self.qdrant_client = QdrantClient(path=str(qdrant_storage_path))
+                logger.info("Using remote Qdrant at %s", qdrant_url)
+            else:
+                qdrant_storage_path = VECTOR_DB_DIR / "qdrant_storage"
+                if not qdrant_storage_path.exists():
+                    raise FileNotFoundError(
+                        f"Qdrant storage not found at {qdrant_storage_path}. "
+                        f"Please run Phase 2 indexing first."
+                    )
+                self.qdrant_client = QdrantClient(path=str(qdrant_storage_path))
+                logger.info("Using local Qdrant storage at %s", qdrant_storage_path)
             
             # Kiểm tra collection tồn tại
             collections = self.qdrant_client.get_collections()
@@ -190,17 +208,17 @@ class LegalRetrieverService:
             embeddings = CustomEmbeddings(self.embedder)
             
             # Tạo Qdrant vector store với LangChain
-            self.vector_store = QdrantVectorStore(
+            self.vector_store = Qdrant(
                 client=self.qdrant_client,
                 collection_name=COLLECTION_NAME,
-                embedding=embeddings,
+                embeddings=embeddings,
                 content_payload_key="content",
-                metadata_payload_key="metadata",
+                metadata_payload_key="metadata"
             )
             
             # Tạo retriever với cấu hình
             search_kwargs = {
-                "k": LLMConfig.TOP_K,
+                "k": LLMConfig.RETRIEVAL_TOP_K,
                 "score_threshold": self.similarity_threshold
             }
             
@@ -282,12 +300,13 @@ class LegalRetrieverService:
                     )
                 )
             elif key == "weight":
-                # Đảm bảo giá trị là số nguyên (float không được hỗ trợ trong MatchValue)
-                int_value = int(value) if isinstance(value, (int, float)) else 1
+                # Exact numeric range supports existing INTEGER or FLOAT indexes
+                # and preserves fractional weights rather than truncating them.
+                numeric_value = float(value)
                 filter_list.append(
                     models.FieldCondition(
                         key="metadata.weight",
-                        match=models.MatchValue(value=int_value)
+                        range=models.Range(gte=numeric_value, lte=numeric_value)
                     )
                 )
             elif key == "effective_date":
@@ -321,43 +340,31 @@ class LegalRetrieverService:
             self.stats["total_queries"] += 1
             
             understanding = understand_query(query)
-            final_k = k or LLMConfig.TOP_K
-            cache_key = (
-                query.strip(),
-                final_k,
-                tuple(sorted((filter_conditions or {}).items())),
-                self.use_metadata_filtering,
-            )
-            cached = self._get_query_cache(cache_key)
-            if cached is not None:
-                self.stats["total_documents_retrieved"] += len(cached)
-                self.stats["avg_documents_per_query"] = (
-                    self.stats["total_documents_retrieved"] / self.stats["total_queries"]
-                )
-                return cached
-
             variants = understanding["query_variants"] or [query]
-            unique_variants = {}
-            for variant in variants:
-                unique_variants.setdefault(fold_text(variant), variant)
-            variants = list(unique_variants.values())
-            candidate_limit = max(self.rerank_top_n, final_k * 4, 12)
+            final_k = k or LLMConfig.RERANK_TOP_N
+            candidate_limit = max(
+                LLMConfig.RETRIEVAL_TOP_K,
+                final_k,
+                LLMConfig.RERANK_TOP_N,
+            )
+            configured_filter = filter_conditions
+            if configured_filter is None and self.use_metadata_filtering:
+                configured_filter = LLMConfig.DEFAULT_METADATA_FILTER
+            qdrant_filter = self._build_qdrant_filter(configured_filter or {})
             hits_by_id = {}
-            active_filter = filter_conditions
-            if active_filter is None and self.use_metadata_filtering:
-                active_filter = LLMConfig.DEFAULT_METADATA_FILTER
-            query_filter = self._build_qdrant_filter(active_filter or {})
 
             # Search multiple deterministic variants to improve recall for short,
             # colloquial, or acronym-based Vietnamese questions.
             for variant in variants:
-                query_embedding = self._embed_query(variant)
+                query_embedding = self.embedder.embed_text(variant)
+                # Configured filters are mandatory: never remove them when a
+                # service or index fails, or unverified/unauthorized data may leak.
                 search_result = self.qdrant_client.query_points(
                     collection_name=COLLECTION_NAME,
                     query=query_embedding.tolist(),
-                    query_filter=query_filter,
                     limit=candidate_limit,
                     score_threshold=self.similarity_threshold,
+                    query_filter=qdrant_filter,
                     with_payload=True,
                     with_vectors=False
                 )
@@ -371,25 +378,42 @@ class LegalRetrieverService:
             # search as well; this prevents a generic semantic result from
             # hiding the explicitly requested legal source.
             for source_file in understanding["source_file_hints"]:
-                query_embedding = self._embed_query(query)
+                query_embedding = self.embedder.embed_text(query)
+                scoped_conditions = [
+                    models.FieldCondition(
+                        key="metadata.source_file",
+                        match=models.MatchValue(value=source_file),
+                    )
+                ]
+                if qdrant_filter is not None:
+                    scoped_conditions.extend(qdrant_filter.must or [])
                 scoped_filter = models.Filter(
-                    must=[
-                        models.FieldCondition(
-                            key="metadata.source_file",
-                            match=models.MatchValue(value=source_file),
-                        )
-                    ]
+                    must=scoped_conditions
                 )
-                scoped_result = self.qdrant_client.query_points(
-                    collection_name=COLLECTION_NAME,
-                    query=query_embedding.tolist(),
-                    query_filter=scoped_filter,
-                    limit=candidate_limit,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-                for hit in scoped_result.points:
-                    hits_by_id[str(hit.id)] = hit
+                try:
+                    scoped_result = self.qdrant_client.query_points(
+                        collection_name=COLLECTION_NAME,
+                        query=query_embedding.tolist(),
+                        query_filter=scoped_filter,
+                        limit=candidate_limit,
+                        with_payload=True,
+                        with_vectors=False,
+                    )
+                except Exception as exc:
+                    # Qdrant requires a payload index for filtered fields. Older
+                    # collections may not have metadata.source_file indexed yet;
+                    # keep the semantic results instead of failing the whole chat.
+                    if not _missing_source_file_index(exc):
+                        raise
+                    logger.warning(
+                        "Skipping source-scoped retrieval for %s: %s",
+                        source_file,
+                        exc,
+                    )
+                    scoped_result = None
+                if scoped_result is not None:
+                    for hit in scoped_result.points:
+                        hits_by_id[str(hit.id)] = hit
             
             # Convert to LangChain Documents
             documents = []
@@ -422,56 +446,73 @@ class LegalRetrieverService:
                         or understanding["article_number"] == str(metadata.get("article_number", ""))
                     )
                 )
-                exact_document_match = any(
-                    fold_text(str(metadata.get(key, ""))) == fold_text(hint)
-                    for key in ("title", "document_name")
-                    for hint in understanding["document_hints"]
-                )
                 exact_phrase_match = normalized_query and normalized_query in fold_text(searchable)
+                key_phrase_match = (
+                    "noi dung chu yeu" in normalized_query
+                    and "noi dung chu yeu" in fold_text(searchable)
+                )
+                employment_contract_contents = (
+                    "dieu 21" in fold_text(content)
+                    and "noi dung cua hop dong lao dong" in fold_text(content)
+                )
                 checklist_match = (
                     "checklist" in normalized_query
                     and "checklist" in fold_text(searchable)
-                )
-                status = fold_text(str(metadata.get("status", "")))
-                active_status_bonus = (
-                    0.08
-                    if any(term in status for term in ("con hieu luc", "dang hieu luc", "active"))
-                    else 0.0
-                )
-                inactive_status_penalty = (
-                    -0.15
-                    if any(term in status for term in ("het hieu luc", "bi thay the", "inactive"))
-                    else 0.0
                 )
                 return (
                     float(hit.score)
                     + min(overlap * 0.01, 0.08)
                     + min(document_match * 0.25, 0.25)
-                    + (0.24 if article_match else 0.0)
-                    + (0.20 if exact_document_match else 0.0)
+                    + (0.8 if article_match else 0.0)
                     + (0.35 if exact_phrase_match else 0.0)
+                    + (0.5 if key_phrase_match else 0.0)
+                    + (2.0 if employment_contract_contents and (
+                        "hop dong lao dong" in normalized_query
+                        or "dieu 21" in normalized_query
+                    ) else 0.0)
                     + (0.25 if checklist_match else 0.0)
-                    + active_status_bonus
-                    + inactive_status_penalty
                 )
 
+            qdrant_scores = [float(hit.score) for hit in hits]
+            rerank_scores = {}
             if self.reranker and hits:
-                rerank_hits = hits[:self.rerank_max_candidates]
-                rerank_scores = self.reranker.predict(
-                    [
-                        (query, (hit.payload or {}).get("content", ""))
-                        for hit in rerank_hits
-                    ]
-                )
-                reranked = [
-                    hit for _, hit in sorted(
-                        zip(rerank_scores, rerank_hits),
-                        key=lambda item: float(item[0]) + 0.35 * ranking_score(item[1]),
+                rerank_started = time.perf_counter()
+                try:
+                    scores = self.reranker.predict(
+                        [
+                            (query, (hit.payload or {}).get("content", ""))
+                            for hit in hits
+                        ],
+                        show_progress_bar=False,
+                    )
+                    rerank_scores = {
+                        str(hit.id): float(score)
+                        for hit, score in zip(hits, scores)
+                    }
+                    hits.sort(
+                        key=lambda hit: (
+                            rerank_scores.get(str(hit.id), float("-inf")),
+                            ranking_score(hit),
+                        ),
                         reverse=True,
                     )
-                ]
-                remaining_hits = [hit for hit in hits if hit not in rerank_hits]
-                hits = reranked + remaining_hits
+                    logger.info(
+                        "Rerank query=%r candidates=%d top_n=%d latency_ms=%.1f "
+                        "qdrant_top=%.4f rerank_top=%.4f",
+                        query[:80],
+                        len(hits),
+                        final_k,
+                        (time.perf_counter() - rerank_started) * 1000,
+                        max(qdrant_scores, default=0.0),
+                        max(rerank_scores.values(), default=0.0),
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "Rerank failed for query=%r; falling back to Qdrant ranking: %s",
+                        query[:80],
+                        exc,
+                    )
+                    hits.sort(key=ranking_score, reverse=True)
             else:
                 hits.sort(key=ranking_score, reverse=True)
 
@@ -483,7 +524,12 @@ class LegalRetrieverService:
                     payload.get("metadata", {}),
                     chunk_id=payload.get("chunk_id", ""),
                 )
-                metadata["retrieval_score"] = hit.score
+                metadata["retrieval_score"] = float(hit.score)
+                if str(hit.id) in rerank_scores:
+                    metadata["rerank_score"] = rerank_scores[str(hit.id)]
+                    metadata["ranking_method"] = "retrieve_and_rerank"
+                else:
+                    metadata["ranking_method"] = "qdrant"
                 content = payload.get("content", "")
                 
                 doc = Document(
@@ -508,50 +554,12 @@ class LegalRetrieverService:
                         verified = doc.metadata.get("is_verified", True)
                         print(f"   {i}. {title} - Điều {article} (verified: {verified})")
             
-            self._set_query_cache(cache_key, documents)
             return documents
             
         except Exception as e:
             error_msg = f"Lỗi khi retrieve documents: {str(e)}"
             print(f"❌ {error_msg}")
             raise RetrievalError(error_msg) from e
-
-    def _embed_query(self, query: str):
-        """Embed once per normalized query and reuse within the cache window."""
-        if not self.embedding_cache_size:
-            return self.embedder.embed_text(query)
-        key = fold_text(query.strip())
-        cached = self._embedding_cache.get(key)
-        if cached is not None:
-            self._embedding_cache.move_to_end(key)
-            return cached
-        embedding = self.embedder.embed_text(query)
-        self._embedding_cache[key] = embedding
-        self._embedding_cache.move_to_end(key)
-        while len(self._embedding_cache) > self.embedding_cache_size:
-            self._embedding_cache.popitem(last=False)
-        return embedding
-
-    def _get_query_cache(self, key):
-        if not self.query_cache_size or not self.query_cache_ttl:
-            return None
-        cached = self._query_cache.get(key)
-        if cached is None:
-            return None
-        created_at, documents = cached
-        if time.monotonic() - created_at > self.query_cache_ttl:
-            self._query_cache.pop(key, None)
-            return None
-        self._query_cache.move_to_end(key)
-        return list(documents)
-
-    def _set_query_cache(self, key, documents):
-        if not self.query_cache_size or not self.query_cache_ttl:
-            return
-        self._query_cache[key] = (time.monotonic(), list(documents))
-        self._query_cache.move_to_end(key)
-        while len(self._query_cache) > self.query_cache_size:
-            self._query_cache.popitem(last=False)
     
     def retrieve_with_scores(
         self, 

@@ -12,6 +12,7 @@ langchain-qdrant
 langchain-ollama
 langchain-openai
 langchain-google-genai
+boto3>=1.34.131,<2
 pytest
 pyyaml
 python-docx
@@ -20,3 +21,4 @@ Pillow
 pytesseract
 PyMuPDF
 python-dotenv
+pydantic-settings
